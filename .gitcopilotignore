@@ -1,0 +1,43 @@
+# Dependencies
+**/node_modules/
+**/.pnpm-store/
+
+# Build and test output
+**/dist/
+**/build/
+**/target/
+**/coverage/
+**/.nyc_output/
+
+# Tool caches
+.vite/
+**/.vite/
+**/.cache/
+**/.turbo/
+**/.parcel-cache/
+**/.eslintcache
+**/.tsbuildinfo
+
+# Runtime and generated files
+**/*.log
+**/tmp/
+**/temp/
+**/.DS_Store
+
+# Local environment and secrets
+.env
+.env.*
+!.env.example
+!.env.sample
+**/application-local.yml
+**/application-local.yaml
+**/application-local.properties
+**/secrets/
+**/*.pem
+**/*.key
+**/*.p12
+
+# IDE and local workspace metadata
+.idea/
+.vscode/
+**/*.iml
