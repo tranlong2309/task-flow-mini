@@ -2,7 +2,7 @@ export type Role = 'MEMBER' | 'MANAGER' | 'ADMIN'
 export type Priority = 'LOW' | 'MEDIUM' | 'HIGH'
 
 export interface User {
-  id: number
+  id: string | number
   name: string
   email: string
   initials: string
@@ -11,29 +11,30 @@ export interface User {
 }
 
 export interface Project {
-  id: number
-  boardId: number
+  id: string | number
+  boardId: string | number
   name: string
   description: string
   color: string
 }
 
 export interface BoardColumn {
-  id: number
+  id: string | number
   name: string
   order: number
   tone: string
 }
 
 export interface Task {
-  id: number
-  projectId: number
-  boardId: number
+  id: string | number
+  projectId?: string | number
+  boardId: string | number
   title: string
   description: string
   status: string
-  columnId: number
-  assigneeId: number
+  columnId?: string | number
+  statusColumnId?: string | number
+  assigneeId?: string | number | null
   priority: Priority
   dueDate: string
   tags: string[]
@@ -43,20 +44,20 @@ export interface Task {
 }
 
 export interface Ticket {
-  id: number
-  taskId: number
+  id: string | number
+  taskId: string | number
   title: string
   description: string
-  statusColumnId: number
+  statusColumnId: string | number
   priority: Priority
-  assigneeId: number
+  assigneeId: string | number
   dueDate: string
   updatedAt: string
 }
 
 export interface Board {
-  id: number
-  projectId: number
+  id: string | number
+  projectId: string | number
   name: string
   description: string
   columns: BoardColumn[]
@@ -64,7 +65,7 @@ export interface Board {
 }
 
 export interface Notification {
-  id: number
+  id: string | number
   title: string
   message: string
   type: 'deadline' | 'assignment' | 'update'

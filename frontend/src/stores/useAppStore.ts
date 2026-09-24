@@ -1,17 +1,17 @@
 import { create } from 'zustand'
 
-type View = 'board' | 'workload' | 'reports' | 'settings'
+type View = 'board' | 'workload' | 'reports' | 'settings' | 'projects' | 'employees'
 interface AppState {
   view: View
   search: string
   priority: string
-  selectedTaskId: number | null
-  selectedProjectId: number
+  selectedTaskId: string | number | null
+  selectedProjectId: string | number
   setView: (view: View) => void
   setSearch: (search: string) => void
   setPriority: (priority: string) => void
-  setSelectedTaskId: (id: number | null) => void
-  setSelectedProjectId: (id: number) => void
+  setSelectedTaskId: (id: string | number | null) => void
+  setSelectedProjectId: (id: string | number) => void
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -19,7 +19,7 @@ export const useAppStore = create<AppState>((set) => ({
   search: '',
   priority: 'all',
   selectedTaskId: null,
-  selectedProjectId: 11,
+  selectedProjectId: '123e4567-e89b-12d3-a456-426614174000',
   setView: (view) => set({ view }),
   setSearch: (search) => set({ search }),
   setPriority: (priority) => set({ priority }),

@@ -1,3 +1,42 @@
 @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap');
 :root { font-family: 'DM Sans', sans-serif; color: #242333; background: #f7f7fb; font-synthesis: none; text-rendering: optimizeLegibility; -webkit-font-smoothing: antialiased; }
 * { box-sizing: border-box; } body { margin: 0; min-width: 320px; } button, input, select { font: inherit; } button { cursor: pointer; }
+
+/* Data Table */
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+}
+
+.data-table th, .data-table td {
+  padding: 12px 16px;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-secondary);
+}
+
+.data-table th {
+  font-weight: 500;
+  font-size: 13px;
+  color: var(--text-primary);
+  background: rgba(0, 0, 0, 0.02);
+}
+
+.data-table td strong {
+  color: var(--text-primary);
+}
+
+.data-table tr:hover td {
+  background: rgba(0, 0, 0, 0.01);
+}
+
+.data-table .align-right {
+  text-align: right;
+}
+
+.flex-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
