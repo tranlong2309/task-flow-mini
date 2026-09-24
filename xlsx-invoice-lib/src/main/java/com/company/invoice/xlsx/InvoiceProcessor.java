@@ -152,7 +152,7 @@ public final class InvoiceProcessor {
             for (BatchJob job : jobs) {
                 futures.add(executor.submit(() -> {
                     if (options.stopOnFirstFailure() && abort.get()) {
-                        return null; // Skipped
+                        return new BatchItemResult(job, Optional.empty(), Optional.of(new BatchJobSkippedException("skipped after an earlier batch failure (stopOnFirstFailure=true)")));
                     }
                     try {
                         ProcessingResult result = process(job.input(), job.output(), job.context());
@@ -170,9 +170,11 @@ public final class InvoiceProcessor {
             List<BatchItemResult> results = new ArrayList<>();
             for (Future<BatchItemResult> future : futures) {
                 try {
-                    BatchItemResult result = future.get();
-                    if (result != null) results.add(result);
+                    results.add(future.get());
                 } catch (InterruptedException exception) {
+                    for (Future<BatchItemResult> f : futures) {
+                        f.cancel(true);
+                    }
                     Thread.currentThread().interrupt();
                     throw new InvoiceIoException("batch processing was interrupted", exception);
                 } catch (Exception exception) {

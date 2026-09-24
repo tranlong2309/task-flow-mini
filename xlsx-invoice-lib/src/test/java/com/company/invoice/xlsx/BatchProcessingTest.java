@@ -99,11 +99,14 @@ class BatchProcessingTest {
         BatchResult result = processor.processBatch(jobs, options);
 
         assertThat(result.hasFailures()).isTrue();
-        // The exact count depends on concurrency and scheduling, but since maxConcurrency=1, 
-        // the first one fails and subsequent jobs shouldn't even execute or be in the result.
-        // Wait, jobs array has 10 items, but the result should have 1 item because we skip the rest.
-        assertThat(result.items()).hasSize(1);
+        assertThat(result.items()).hasSize(10);
         assertThat(result.items().get(0).succeeded()).isFalse();
+        assertThat(result.items().get(0).error().get()).isInstanceOf(ExcelFormatException.class);
+        
+        for (int i = 1; i < 10; i++) {
+            assertThat(result.items().get(i).succeeded()).isFalse();
+            assertThat(result.items().get(i).error().get()).isInstanceOf(BatchJobSkippedException.class);
+        }
     }
 
     @Test
@@ -122,7 +125,7 @@ class BatchProcessingTest {
     @Test
     void rejectsSameInputOutput() {
         assertThatThrownBy(() -> BatchJob.of(goodFile, goodFile))
-            .isInstanceOf(InvoiceIoException.class)
+            .isInstanceOf(IllegalArgumentException.class)
             .hasMessageContaining("must not be the same");
     }
 

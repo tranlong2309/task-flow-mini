@@ -19,10 +19,10 @@ This will run tests in the `com.company.invoice.xlsx` package tagged with `@Tag(
 
 The scaling benchmark (`LargeWorkbookPerformanceTest`) generates large synthetic workbooks and measures elapsed time and memory allocation.
 
-**Reference Machine Baseline:**
-- **10,000 rows**: ~1.7 seconds (177 ms per 1000 rows)
-- **100,000 rows**: ~16.7 seconds (167 ms per 1000 rows)
-- **Scaling Ratio**: ~9.42x 
+**Reference Machine Baseline (8-core CPU):**
+- **10,000 rows**: ~0.86 seconds (85.8 ms per 1000 rows)
+- **100,000 rows**: ~5.5 seconds (55.2 ms per 1000 rows)
+- **Scaling Ratio**: ~6.43x
 
 **Key Takeaways:**
 - **Linear Scaling**: The processing time scales linearly with the number of rows (the 100k test takes roughly 10x the time of the 10k test, rather than exponentially more).
@@ -33,10 +33,10 @@ The scaling benchmark (`LargeWorkbookPerformanceTest`) generates large synthetic
 
 The load test (`ConcurrentProcessingLoadTest`) shares a single `InvoiceProcessor` across a fixed thread pool and processes 5,000-row files concurrently.
 
-**Reference Machine Baseline (5,000 rows per file):**
-- **Concurrency Level 10** (10 concurrent jobs): ~17 seconds total wall time (avg 8.2s latency per call)
-- **Concurrency Level 100** (100 concurrent jobs): ~72 seconds total wall time (avg 28.5s latency per call)
-- **Concurrency Level 1000** (1000 concurrent jobs, capped thread pool): ~339 seconds total wall time (avg 53s latency per call)
+**Reference Machine Baseline (5,000 rows per file, 8-core CPU):**
+- **Concurrency Level 10** (10 concurrent jobs): ~2.0 seconds total wall time (avg 2.0s latency per call)
+- **Concurrency Level 100** (100 concurrent jobs): ~13.1 seconds total wall time (avg 11.9s latency per call)
+- **Concurrency Level 1000** (1000 concurrent jobs, capped thread pool 160): ~190 seconds total wall time (avg 29.5s latency per call)
 
 *(Note: The test automatically caps the thread pool size to `availableProcessors * 20` to avoid crashing the JVM on constrained CI runners when testing 1000 concurrency).*
 

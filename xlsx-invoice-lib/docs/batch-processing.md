@@ -54,7 +54,7 @@ BatchResult result = processor.processBatch(jobs, options);
 
 ### Options Overview:
 - `maxConcurrency`: Defaults to your machine's available processors. Controls the size of the internal thread pool. Due to the CPU-intensive nature of SAX XML parsing, it is recommended **not** to exceed your available logical CPU cores.
-- `stopOnFirstFailure`: Defaults to `false`. When enabled, the library will abort processing the remainder of the batch if any job throws an `InvoiceException`. Already running jobs will complete, but pending jobs will be skipped and omitted from the final `BatchResult`.
+- `stopOnFirstFailure`: Defaults to `false`. When enabled, the library will abort processing the remainder of the batch if any job throws an `InvoiceException`. Already running jobs will complete, but pending jobs are represented as failed `BatchItemResult`s containing a `BatchJobSkippedException`. The `result.items().size()` always equals the submitted job count regardless of `stopOnFirstFailure`.
 - `executor`: You can provide a custom `ExecutorService` if you want to integrate with an existing application thread pool. The processor will use it to submit jobs but will **not** shut it down.
 
 ## Partial Failures

@@ -21,7 +21,7 @@ public record BatchJob(Path input, Path output, JobContext context) {
         Objects.requireNonNull(output, "output");
         Objects.requireNonNull(context, "context");
         if (input.toAbsolutePath().normalize().equals(output.toAbsolutePath().normalize())) {
-            throw new InvoiceIoException("input and output paths must not be the same");
+            throw new IllegalArgumentException("input and output paths must not be the same");
         }
     }
 
