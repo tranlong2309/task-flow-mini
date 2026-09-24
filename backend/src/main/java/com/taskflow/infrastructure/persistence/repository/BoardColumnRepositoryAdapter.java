@@ -1,0 +1,29 @@
+package com.taskflow.infrastructure.persistence.repository;
+
+import java.util.List;
+
+import com.taskflow.domain.model.BoardColumn;
+import com.taskflow.domain.repository.BoardColumnRepositoryPort;
+import org.springframework.stereotype.Component;
+import java.util.Optional;
+
+@Component
+public class BoardColumnRepositoryAdapter implements BoardColumnRepositoryPort {
+    private final SpringDataBoardColumnRepository repository;
+
+    public BoardColumnRepositoryAdapter(SpringDataBoardColumnRepository repository) {
+        this.repository = repository;
+    }
+
+    @Override
+    public Optional<BoardColumn> findById(Long id) {
+        return repository.findById(id).map(e -> new BoardColumn(e.getId(), e.getBoardId(), e.getName(), e.getPosition()));
+    }
+
+    @Override
+    public List<BoardColumn> findByBoardId(java.util.UUID boardId) {
+        return repository.findByBoardIdOrderByPositionAsc(boardId).stream()
+                .map(e -> new BoardColumn(e.getId(), e.getBoardId(), e.getName(), e.getPosition()))
+                .collect(java.util.stream.Collectors.toList());
+    }
+}

@@ -1,0 +1,16 @@
+plugins {
+    id 'java'
+}
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+}
+
+dependencies {
+    implementation 'com.company.invoice:xlsx-invoice-lib:1.0.0'
+}
+
+java {
+    toolchain { languageVersion = JavaLanguageVersion.of(17) }
+}

@@ -1,0 +1,38 @@
+name: xlsx-invoice-lib CI
+
+on:
+  push:
+    branches: [ "common1" ]
+    paths:
+      - 'xlsx-invoice-lib/**'
+      - '.github/workflows/xlsx-invoice-lib-ci.yml'
+  pull_request:
+    branches: [ "common1" ]
+    paths:
+      - 'xlsx-invoice-lib/**'
+      - '.github/workflows/xlsx-invoice-lib-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build and Test xlsx-invoice-lib
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Build and Test (Default)
+        run: mvn -B clean verify
+        working-directory: xlsx-invoice-lib
+
+      - name: Build and Test (Performance)
+        run: mvn -B test -Pperformance
+        working-directory: xlsx-invoice-lib
+
