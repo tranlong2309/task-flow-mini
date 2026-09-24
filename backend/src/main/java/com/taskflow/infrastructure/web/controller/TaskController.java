@@ -1,0 +1,114 @@
+package com.taskflow.infrastructure.web.controller;
+
+import com.taskflow.application.port.in.CreateTaskUseCase;
+import com.taskflow.application.port.in.DeleteTaskUseCase;
+import com.taskflow.application.port.in.GetTaskUseCase;
+import com.taskflow.application.port.in.SearchTasksUseCase;
+import com.taskflow.application.port.in.UpdateTaskUseCase;
+import com.taskflow.domain.model.Priority;
+import com.taskflow.domain.model.Task;
+import com.taskflow.infrastructure.security.CustomUserDetails;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.web.bind.annotation.*;
+
+import java.time.Instant;
+import java.util.Map;
+import java.util.UUID;
+import java.util.List;
+
+@RestController
+@RequestMapping("/api/v1")
+public class TaskController {
+
+    private final CreateTaskUseCase createTaskUseCase;
+    private final UpdateTaskUseCase updateTaskUseCase;
+    private final GetTaskUseCase getTaskUseCase;
+    private final SearchTasksUseCase searchTasksUseCase;
+    private final DeleteTaskUseCase deleteTaskUseCase;
+
+    public TaskController(CreateTaskUseCase createTaskUseCase,
+                          UpdateTaskUseCase updateTaskUseCase,
+                          GetTaskUseCase getTaskUseCase,
+                          SearchTasksUseCase searchTasksUseCase,
+                          DeleteTaskUseCase deleteTaskUseCase) {
+        this.createTaskUseCase = createTaskUseCase;
+        this.updateTaskUseCase = updateTaskUseCase;
+        this.getTaskUseCase = getTaskUseCase;
+        this.searchTasksUseCase = searchTasksUseCase;
+        this.deleteTaskUseCase = deleteTaskUseCase;
+    }
+
+    @PostMapping("/tasks")
+    public ResponseEntity<?> createTask(@RequestBody Map<String, Object> payload,
+                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            UUID boardId = UUID.fromString(payload.get("boardId").toString());
+            String title = (String) payload.get("title");
+            String description = (String) payload.get("description");
+            Long assigneeId = payload.get("assigneeId") != null ? Long.valueOf(payload.get("assigneeId").toString()) : null;
+            Priority priority = Priority.valueOf((String) payload.get("priority"));
+            Instant dueDate = payload.get("dueDate") != null ? Instant.parse(payload.get("dueDate").toString()) : null;
+            Long statusColumnId = payload.get("statusColumnId") != null ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
+
+            Task task = createTaskUseCase.createTask(boardId, title, description, assigneeId, priority, dueDate, statusColumnId, userDetails.getId());
+            return ResponseEntity.status(HttpStatus.CREATED).body(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PutMapping("/tasks/{taskId}")
+    public ResponseEntity<?> updateTask(@PathVariable UUID taskId,
+                                        @RequestBody Map<String, Object> payload,
+                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            String title = payload.containsKey("title") ? (String) payload.get("title") : null;
+            String description = payload.containsKey("description") ? (String) payload.get("description") : null;
+            Long assigneeId = payload.containsKey("assigneeId") && payload.get("assigneeId") != null ? Long.valueOf(payload.get("assigneeId").toString()) : null;
+            Priority priority = payload.containsKey("priority") ? Priority.valueOf((String) payload.get("priority")) : null;
+            Instant dueDate = payload.containsKey("dueDate") && payload.get("dueDate") != null ? Instant.parse(payload.get("dueDate").toString()) : null;
+            Long statusColumnId = payload.containsKey("statusColumnId") && payload.get("statusColumnId") != null ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
+
+            Task task = updateTaskUseCase.updateTask(taskId, title, description, assigneeId, priority, dueDate, statusColumnId, userDetails.getId());
+            return ResponseEntity.ok(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/tasks/{taskId}")
+    public ResponseEntity<?> getTask(@PathVariable UUID taskId,
+                                     @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            Task task = getTaskUseCase.getTask(taskId, userDetails.getId());
+            return ResponseEntity.ok(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @GetMapping("/boards/{boardId}/tasks")
+    public ResponseEntity<?> searchTasks(@PathVariable UUID boardId,
+                                         @RequestParam(required = false) Long statusColumnId,
+                                         @RequestParam(required = false) Long assigneeId,
+                                         @RequestParam(required = false) Priority priority,
+                                         @RequestParam(required = false) String search,
+                                         @RequestParam(required = false) Boolean overdueOnly,
+                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+        List<Task> tasks = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, userDetails.getId());
+        return ResponseEntity.ok(tasks);
+    }
+    
+    @DeleteMapping("/tasks/{taskId}")
+    public ResponseEntity<?> deleteTask(@PathVariable UUID taskId,
+                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            deleteTaskUseCase.deleteTask(taskId, userDetails.getId());
+            return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+}
