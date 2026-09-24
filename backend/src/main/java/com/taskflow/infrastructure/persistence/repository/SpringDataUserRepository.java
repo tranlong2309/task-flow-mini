@@ -8,5 +8,6 @@ import java.util.Optional;
 
 @Repository
 public interface SpringDataUserRepository extends JpaRepository<UserEntity, Long> {
+    @org.springframework.data.jpa.repository.EntityGraph(attributePaths = {"roles", "teams"})
     Optional<UserEntity> findByEmail(String email);
 }
