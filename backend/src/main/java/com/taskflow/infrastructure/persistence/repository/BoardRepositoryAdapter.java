@@ -30,6 +30,13 @@ public class BoardRepositoryAdapter implements BoardRepositoryPort {
                 .map(this::toDomain);
     }
 
+    @Override
+    public java.util.List<Board> findByTeamId(Long teamId) {
+        return springDataBoardRepository.findByTeamId(teamId).stream()
+                .map(this::toDomain)
+                .collect(java.util.stream.Collectors.toList());
+    }
+
     private BoardEntity toEntity(Board board) {
         return new BoardEntity(
                 board.getId(),
