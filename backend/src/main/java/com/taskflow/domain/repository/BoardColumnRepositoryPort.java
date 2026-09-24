@@ -8,4 +8,6 @@ import java.util.UUID;
 public interface BoardColumnRepositoryPort {
     Optional<BoardColumn> findById(Long id);
     List<BoardColumn> findByBoardId(UUID boardId);
+    List<BoardColumn> saveAll(List<BoardColumn> columns);
+    void deleteAllByBoardId(UUID boardId);
 }

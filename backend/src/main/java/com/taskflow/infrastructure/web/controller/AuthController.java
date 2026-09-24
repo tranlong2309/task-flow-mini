@@ -20,12 +20,16 @@ public class AuthController {
 
     private final AuthenticationManager authenticationManager;
     private final JwtUtil jwtUtil;
+    private final org.springframework.security.crypto.password.PasswordEncoder passwordEncoder;
+    private final com.taskflow.application.port.in.GetUserInfoUseCase getUserInfoUseCase;
 
-    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil) {
+    public AuthController(AuthenticationManager authenticationManager, JwtUtil jwtUtil, org.springframework.security.crypto.password.PasswordEncoder passwordEncoder, com.taskflow.application.port.in.GetUserInfoUseCase getUserInfoUseCase) {
         this.authenticationManager = authenticationManager;
         this.jwtUtil = jwtUtil;
+        this.passwordEncoder = passwordEncoder;
+        this.getUserInfoUseCase = getUserInfoUseCase;
     }
-
+    
     @PostMapping("/login")
     public ResponseEntity<?> login(@RequestBody Map<String, String> request) {
         try {
@@ -36,11 +40,22 @@ public class AuthController {
                     new UsernamePasswordAuthenticationToken(email, password)
             );
 
-            UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+            com.taskflow.infrastructure.security.CustomUserDetails userDetails = (com.taskflow.infrastructure.security.CustomUserDetails) authentication.getPrincipal();
             String token = jwtUtil.generateToken(userDetails);
+            
+            com.taskflow.domain.model.User user = getUserInfoUseCase.getCurrentUser(userDetails.getId());
+            Map<String, Object> userMap = Map.of(
+                "id", user.getId(),
+                "name", user.getName(),
+                "email", user.getEmail(),
+                "role", user.getRole(),
+                "initials", user.getName().substring(0, Math.min(2, user.getName().length())).toUpperCase(),
+                "color", "blue"
+            );
 
-            return ResponseEntity.ok(Map.of("token", token));
+            return ResponseEntity.ok(Map.of("token", token, "user", userMap));
         } catch (Exception e) {
+            e.printStackTrace();
             return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body(Map.of("error", "Invalid credentials"));
         }
     }

@@ -15,7 +15,8 @@ class BoardApplicationServiceTest {
     @Test
     void createBoard_shouldCreateAndPersistBoard() {
         BoardRepositoryPort repository = mock(BoardRepositoryPort.class);
-        BoardApplicationService service = new BoardApplicationService(repository);
+        com.taskflow.domain.repository.BoardColumnRepositoryPort columnRepository = mock(com.taskflow.domain.repository.BoardColumnRepositoryPort.class);
+        BoardApplicationService service = new BoardApplicationService(repository, columnRepository);
 
         Board sample = new Board(UUID.randomUUID(), "Board A", "Desc", 1L);
         when(repository.save(any(Board.class))).thenReturn(sample);
@@ -31,7 +32,8 @@ class BoardApplicationServiceTest {
     @Test
     void createBoard_shouldHandleMissingName() {
         BoardRepositoryPort repository = mock(BoardRepositoryPort.class);
-        BoardApplicationService service = new BoardApplicationService(repository);
+        com.taskflow.domain.repository.BoardColumnRepositoryPort columnRepository = mock(com.taskflow.domain.repository.BoardColumnRepositoryPort.class);
+        BoardApplicationService service = new BoardApplicationService(repository, columnRepository);
 
         assertThrows(IllegalArgumentException.class, () -> {
             service.createBoard(null, "Desc", 1L);

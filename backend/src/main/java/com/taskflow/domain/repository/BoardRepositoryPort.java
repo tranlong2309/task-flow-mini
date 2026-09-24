@@ -10,4 +10,5 @@ public interface BoardRepositoryPort {
     Board save(Board board);
     Optional<Board> findById(UUID id);
     List<Board> findByTeamId(Long teamId);
+    void deleteById(UUID id);
 }

@@ -13,6 +13,7 @@ import java.util.UUID;
 public class BoardEntity {
 
     @Id
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.BINARY)
     private UUID id;
 
     @Column(nullable = false, length = 100)

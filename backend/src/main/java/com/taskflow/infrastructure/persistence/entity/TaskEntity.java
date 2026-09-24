@@ -9,9 +9,11 @@ import java.util.UUID;
 @Table(name = "tasks")
 public class TaskEntity {
     @Id
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.BINARY)
     private UUID id;
 
     @Column(name = "board_id", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.BINARY)
     private UUID boardId;
 
     @Column(nullable = false)

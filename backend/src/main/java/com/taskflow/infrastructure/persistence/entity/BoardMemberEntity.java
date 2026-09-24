@@ -10,6 +10,7 @@ public class BoardMemberEntity {
 
     @Id
     @Column(name = "board_id")
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.BINARY)
     private UUID boardId;
 
     @Id

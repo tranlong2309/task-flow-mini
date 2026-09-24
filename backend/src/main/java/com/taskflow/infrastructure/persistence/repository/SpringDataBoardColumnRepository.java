@@ -10,4 +10,5 @@ import java.util.UUID;
 @Repository
 public interface SpringDataBoardColumnRepository extends JpaRepository<BoardColumnEntity, Long> {
     List<BoardColumnEntity> findByBoardIdOrderByPositionAsc(UUID boardId);
+    void deleteByBoardId(UUID boardId);
 }

@@ -37,6 +37,11 @@ public class BoardRepositoryAdapter implements BoardRepositoryPort {
                 .collect(java.util.stream.Collectors.toList());
     }
 
+    @Override
+    public void deleteById(UUID id) {
+        springDataBoardRepository.deleteById(id);
+    }
+
     private BoardEntity toEntity(Board board) {
         return new BoardEntity(
                 board.getId(),
