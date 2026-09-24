@@ -49,6 +49,10 @@ public final class WorkbookProcessor {
     }
 
     public ProcessingResult process(Path input, Path output) {
+        return process(input, output, new JobExecution(config, new com.company.invoice.xlsx.JobContext()));
+    }
+
+    public ProcessingResult process(Path input, Path output, JobExecution execution) {
         Path temporaryOutput = null;
         try {
             validateInputFile(input);
@@ -56,7 +60,7 @@ public final class WorkbookProcessor {
             if (outputDirectory == null) outputDirectory = Path.of(".").toAbsolutePath();
             Files.createDirectories(outputDirectory);
             temporaryOutput = outputDirectory.resolve(".xlsx-invoice-" + UUID.randomUUID() + ".tmp");
-            ProcessingResult state = parse(input, temporaryOutput);
+            ProcessingResult state = parse(input, temporaryOutput, execution);
             moveAtomically(temporaryOutput, output);
             temporaryOutput = null;
             return state;
@@ -73,6 +77,10 @@ public final class WorkbookProcessor {
     }
 
     public ProcessingResult process(InputStream input, OutputStream output) {
+        return process(input, output, new JobExecution(config, new com.company.invoice.xlsx.JobContext()));
+    }
+
+    public ProcessingResult process(InputStream input, OutputStream output, JobExecution execution) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(output, "output");
         Path spool = null;
@@ -84,7 +92,7 @@ public final class WorkbookProcessor {
             copyBounded(input, spool, config.maxInputBytes());
             Path destination = directory.resolve("xlsx-invoice-output-" + UUID.randomUUID() + ".xlsx");
             temporaryOutput = destination;
-            ProcessingResult state = parse(spool, temporaryOutput);
+            ProcessingResult state = parse(spool, temporaryOutput, execution);
             try (InputStream generated = Files.newInputStream(temporaryOutput)) {
                 generated.transferTo(output);
             }
@@ -108,7 +116,7 @@ public final class WorkbookProcessor {
     }
 
     @SuppressWarnings("deprecation")
-    private ProcessingResult parse(Path input, Path temporaryOutput) throws Exception {
+    private ProcessingResult parse(Path input, Path temporaryOutput, JobExecution execution) throws Exception {
         try (OPCPackage packageHandle = OPCPackage.open(input.toFile(), PackageAccess.READ)) {
             XSSFReader reader = new XSSFReader(packageHandle);
             ReadOnlySharedStringsTable sharedStrings = new ReadOnlySharedStringsTable(packageHandle);
@@ -133,7 +141,7 @@ public final class WorkbookProcessor {
             if (sheetStream == null) throw new ExcelFormatException("selected sheet was not found");
             InputStream selectedSheet = sheetStream;
             try (selectedSheet) {
-                ProcessingHandler handler = new ProcessingHandler(config, sheetName, temporaryOutput);
+                ProcessingHandler handler = new ProcessingHandler(config, sheetName, temporaryOutput, execution);
                 XMLReader xmlReader = XMLReaderFactory.createXMLReader();
                 xmlReader.setContentHandler(new XSSFSheetXMLHandler(styles, null, sharedStrings, handler,
                     new NumericPreservingDataFormatter(), false));
@@ -217,6 +225,7 @@ public final class WorkbookProcessor {
         private final String sheetName;
         private final Path temporaryOutput;
         private final ErrorCollector errors;
+        private final JobExecution execution;
         private final Map<Integer, String> cells = new HashMap<>();
         private final List<String> candidateHeaders = new ArrayList<>();
         private WorkbookWriter writer;
@@ -233,11 +242,12 @@ public final class WorkbookProcessor {
         private BigDecimal afterTotal = BigDecimal.ZERO;
         private boolean sawDataRow;
 
-        private ProcessingHandler(InvoiceConfig config, String sheetName, Path temporaryOutput) {
+        private ProcessingHandler(InvoiceConfig config, String sheetName, Path temporaryOutput, JobExecution execution) {
             this.handlerConfig = config;
             this.sheetName = sheetName;
             this.temporaryOutput = temporaryOutput;
             this.errors = new ErrorCollector(config.maxReportedErrors());
+            this.execution = execution;
         }
 
         @Override public void startRow(int row) { currentRow = row + 1; cells.clear(); }
@@ -255,6 +265,7 @@ public final class WorkbookProcessor {
                     mapping = detected;
                     columnMapping = createColumnMapping(candidateHeaders);
                     writer = new WorkbookWriter(handlerConfig);
+                    execution.header(sheetName, currentRow, mapping.toString(), columnMapping.ignoredColumns().size());
                 } else if (nonBlankRows >= handlerConfig.headerSearchLimit()) {
                     throw new ExcelFormatException("Header row not found in sheet '" + sheetName + "' within first " + handlerConfig.headerSearchLimit() + " non-blank rows");
                 }
@@ -308,9 +319,19 @@ public final class WorkbookProcessor {
             if (quantity != null && quantity.signum() > 0 && quantity.scale() > 3) rowErrors.add(error(InvoiceColumn.QUANTITY, quantityText, ErrorCode.TOO_MANY_DECIMALS, "quantity has more than 3 decimal places"));
             if (unitPrice != null && unitPrice.signum() < 0) rowErrors.add(error(InvoiceColumn.UNIT_PRICE, unitPriceText, ErrorCode.OUT_OF_RANGE, "value must not be negative"));
             if (vatRate != null && (vatRate.signum() < 0 || vatRate.compareTo(BigDecimal.valueOf(100)) > 0)) rowErrors.add(error(InvoiceColumn.VAT_RATE, vatRateText, ErrorCode.OUT_OF_RANGE, "value must be between 0 and 100"));
-            if (!rowErrors.isEmpty()) { addErrors(rowErrors); skippedRowCount++; return; }
+            if (!rowErrors.isEmpty()) {
+                addErrors(rowErrors);
+                skippedRowCount++;
+                execution.progress(dataRowCount, processedRowCount, skippedRowCount);
+                return;
+            }
             Calculator.CalculationResult calculation = Calculator.calculate(handlerConfig, List.of(new InvoiceItem(itemName, quantity, unitPrice, vatRate)), sheetName);
-            if (!calculation.errors().isEmpty()) { addErrors(calculation.errors()); skippedRowCount++; return; }
+            if (!calculation.errors().isEmpty()) {
+                addErrors(calculation.errors());
+                skippedRowCount++;
+                execution.progress(dataRowCount, processedRowCount, skippedRowCount);
+                return;
+            }
             InvoiceLine line = calculation.lines().get(0);
             line = new InvoiceLine(++outputLineNumber, line.itemName(), line.quantity(), line.unitPrice(), line.vatRate(), line.amountBeforeVat(), line.vatAmount(), line.amountAfterVat());
             writer.writeLine(line, handlerConfig.scale());
@@ -318,6 +339,7 @@ public final class WorkbookProcessor {
             beforeTotal = beforeTotal.add(line.amountBeforeVat());
             vatTotal = vatTotal.add(line.vatAmount());
             afterTotal = afterTotal.add(line.amountAfterVat());
+            execution.progress(dataRowCount, processedRowCount, skippedRowCount);
         }
 
         private BigDecimal parseNumber(String value, InvoiceColumn column, List<RowError> rowErrors) {
@@ -339,7 +361,12 @@ public final class WorkbookProcessor {
             return new RowError(sheetName, currentRow, cell, column.headerName(), value, code,
                     "Sheet '" + sheetName + "', row " + currentRow + ", cell " + cell + " (column '" + column.headerName() + "'): " + reason);
         }
-        private void addErrors(List<RowError> rowErrors) { rowErrors.forEach(errors::add); }
+        private void addErrors(List<RowError> rowErrors) {
+            rowErrors.forEach(error -> {
+                errors.add(error);
+                execution.rowError(error);
+            });
+        }
 
         private ProcessingResult result() {
             if (mapping == null) throw new ExcelFormatException("Header row not found in sheet '" + sheetName + "'");
@@ -353,8 +380,8 @@ public final class WorkbookProcessor {
             } catch (IOException exception) {
                 throw new InvoiceIoException("could not write output workbook", exception);
             } finally { writer.close(); }
-            return new ProcessingResult(totals, dataRowCount, processedRowCount, skippedRowCount, errors.values(), errors.omitted() > 0,
-                    sheetName, columnMapping.headerRowNumber(), columnMapping);
+                return new ProcessingResult(totals, dataRowCount, processedRowCount, skippedRowCount, errors.values(), errors.omitted() > 0,
+                    sheetName, columnMapping.headerRowNumber(), columnMapping, execution.jobId(), execution.jobLogFile());
         }
     }
 

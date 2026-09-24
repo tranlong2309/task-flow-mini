@@ -84,6 +84,10 @@ Use `scale(0)` for currencies without minor units such as VND. VAT `10` means 10
 
 Create one processor per configuration and share it across tasks. Each call uses unique temporary paths, isolated state, and atomic output publication. The library creates no threads; the host controls its executor size. See [docs/concurrency.md](docs/concurrency.md).
 
+## Logging
+
+Diagnostic events use SLF4J 2.x and never install a logging provider. Use `JobContext.of("order-123")` for request correlation, and enable per-job files with `jobLogDirectory(...)`. See [docs/logging.md](docs/logging.md).
+
 ## Running Tests
 
 Prerequisites: Java 17 and Maven 3.9 or newer. Run these commands from the `xlsx-invoice-lib` directory.

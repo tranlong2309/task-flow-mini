@@ -24,6 +24,10 @@ public final class InvoiceConfig {
     private final int maxReportedErrors;
     private final long maxInputBytes;
     private final Path tempDirectory;
+    private final Path jobLogDirectory;
+    private final boolean logTotals;
+    private final long progressLogInterval;
+    private final int logValueMaxLength;
 
     private InvoiceConfig(Builder builder) {
         this.scale = builder.scale;
@@ -38,6 +42,10 @@ public final class InvoiceConfig {
         this.maxReportedErrors = builder.maxReportedErrors;
         this.maxInputBytes = builder.maxInputBytes;
         this.tempDirectory = builder.tempDirectory;
+        this.jobLogDirectory = builder.jobLogDirectory;
+        this.logTotals = builder.logTotals;
+        this.progressLogInterval = builder.progressLogInterval;
+        this.logValueMaxLength = builder.logValueMaxLength;
     }
 
     /**
@@ -60,6 +68,10 @@ public final class InvoiceConfig {
     /** @return maximum retained row errors */ public int maxReportedErrors() { return maxReportedErrors; }
     /** @return maximum accepted input size in bytes */ public long maxInputBytes() { return maxInputBytes; }
     /** @return temporary directory, or null for the system default */ public Path tempDirectory() { return tempDirectory; }
+    /** @return optional per-job log directory */ public Path jobLogDirectory() { return jobLogDirectory; }
+    /** @return whether totals are included in diagnostic logs */ public boolean logTotals() { return logTotals; }
+    /** @return progress event interval, or zero when disabled */ public long progressLogInterval() { return progressLogInterval; }
+    /** @return maximum logged cell-value length */ public int logValueMaxLength() { return logValueMaxLength; }
 
     /** Mutable builder used only while constructing an immutable configuration. */
     public static final class Builder {
@@ -75,6 +87,10 @@ public final class InvoiceConfig {
         private int maxReportedErrors = DEFAULT_MAX_REPORTED_ERRORS;
         private long maxInputBytes = DEFAULT_MAX_INPUT_BYTES;
         private Path tempDirectory;
+        private Path jobLogDirectory;
+        private boolean logTotals;
+        private long progressLogInterval = 10_000;
+        private int logValueMaxLength = 100;
 
         /**
          * Sets the monetary scale.
@@ -148,6 +164,33 @@ public final class InvoiceConfig {
          * @return this builder
          */
         public Builder tempDirectory(Path value) { this.tempDirectory = value; return this; }
+        /** 
+         * Sets the job-log directory.
+         * @param value job-log directory, or null to disable job logs 
+         * @return this builder 
+         */
+        public Builder jobLogDirectory(Path value) { this.jobLogDirectory = value; return this; }
+        
+        /** 
+         * Sets whether to include totals in diagnostic logs.
+         * @param value whether to include totals in logs 
+         * @return this builder 
+         */
+        public Builder logTotals(boolean value) { this.logTotals = value; return this; }
+        
+        /** 
+         * Sets the progress event interval.
+         * @param value progress interval, zero disables progress 
+         * @return this builder 
+         */
+        public Builder progressLogInterval(long value) { this.progressLogInterval = value; return this; }
+        
+        /** 
+         * Sets the maximum logged cell-value length.
+         * @param value maximum logged value length 
+         * @return this builder 
+         */
+        public Builder logValueMaxLength(int value) { this.logValueMaxLength = value; return this; }
 
         /**
          * Builds and validates the immutable configuration.
@@ -160,6 +203,8 @@ public final class InvoiceConfig {
             if (headerSearchLimit < 1) throw new IllegalArgumentException("headerSearchLimit must be positive");
             if (maxReportedErrors < 1) throw new IllegalArgumentException("maxReportedErrors must be positive");
             if (maxInputBytes < 1) throw new IllegalArgumentException("maxInputBytes must be positive");
+            if (progressLogInterval < 0) throw new IllegalArgumentException("progressLogInterval must not be negative");
+            if (logValueMaxLength < 1) throw new IllegalArgumentException("logValueMaxLength must be positive");
             requireName(outputSheetName, "outputSheetName");
             requireName(errorSheetName, "errorSheetName");
             if (outputSheetName.equals(errorSheetName)) throw new IllegalArgumentException("sheet names must differ");

@@ -2,6 +2,10 @@ import java.io.OutputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.stream.Stream;
+import com.company.invoice.xlsx.InvoiceConfig;
+import com.company.invoice.xlsx.InvoiceProcessor;
+import com.company.invoice.xlsx.JobContext;
 import org.apache.poi.ss.usermodel.Cell;
 import org.apache.poi.ss.usermodel.CellStyle;
 import org.apache.poi.ss.usermodel.Row;
@@ -18,6 +22,42 @@ public final class GenerateSamples {
         create(directory.resolve("sample-input-minimal.xlsx"), false, false, false);
         create(directory.resolve("sample-input-percent.xlsx"), true, false, false);
         create(directory.resolve("sample-input-with-errors.xlsx"), false, true, true);
+        generateJobLog(directory);
+    }
+
+    private static void generateJobLog(Path directory) throws Exception {
+        Path logDir = directory.resolve("logs");
+        InvoiceProcessor processor = InvoiceProcessor.create(InvoiceConfig.builder()
+                .jobLogDirectory(logDir)
+                .build());
+        Path input = directory.resolve("sample-input-with-errors.xlsx");
+        Path output = directory.resolve("sample-output-with-errors.xlsx");
+        
+        processor.process(input, output, JobContext.of("order-123"));
+        
+        try (Stream<Path> files = Files.list(logDir)) {
+            Path logFile = files.findFirst().orElseThrow();
+            String content = Files.readString(logFile);
+            
+            content = content.replaceAll("\\[[a-f0-9\\-]{36}\\]", "[7c1e5b9a-2f34-4a8e-9d10-3b6f0c8e1a55]");
+            
+            String[] lines = content.split("\n");
+            StringBuilder normalized = new StringBuilder();
+            long timeBase = 123;
+            for (String line : lines) {
+                if (line.isEmpty()) continue;
+                String replacementTime = "2026-09-24T03:15:20." + String.format("%03d", timeBase) + "Z";
+                line = line.replaceFirst("^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}\\.\\d+Z", replacementTime);
+                if (line.contains("elapsedMs=")) {
+                    line = line.replaceFirst("elapsedMs=\\d+", "elapsedMs=287");
+                }
+                normalized.append(line).append("\n");
+                timeBase += 100; // arbitrary stable increments
+            }
+            Files.writeString(directory.resolve("sample-job.log"), normalized.toString());
+            Files.delete(logFile);
+            Files.delete(logDir);
+        }
     }
 
     private static void create(Path path, boolean percent, boolean errors, boolean extraColumns) throws Exception {

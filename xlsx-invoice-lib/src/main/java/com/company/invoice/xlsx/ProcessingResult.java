@@ -1,11 +1,14 @@
 package com.company.invoice.xlsx;
 
 import java.util.List;
+import java.nio.file.Path;
+import java.util.Optional;
 
 /** Bounded-memory result of a workbook processing call. */
 public record ProcessingResult(InvoiceTotals totals, long dataRowCount, long processedRowCount,
                                long skippedRowCount, List<RowError> errors, boolean errorsTruncated,
-                               String sheetName, int headerRowNumber, ColumnMapping columnMapping) {
+                               String sheetName, int headerRowNumber, ColumnMapping columnMapping,
+                               String jobId, Optional<Path> jobLogFile) {
     /**
      * Creates an immutable bounded processing result.
      * @param totals invoice totals
@@ -17,9 +20,12 @@ public record ProcessingResult(InvoiceTotals totals, long dataRowCount, long pro
      * @param sheetName processed sheet name
      * @param headerRowNumber physical header row number
      * @param columnMapping detected required-column mapping
+     * @param jobId the unique job identifier
+     * @param jobLogFile the path to the optional job log file
      */
     public ProcessingResult {
         errors = List.copyOf(errors);
+        jobLogFile = jobLogFile == null ? Optional.empty() : jobLogFile;
     }
 
     /** @return true when at least one row error was reported or truncated */

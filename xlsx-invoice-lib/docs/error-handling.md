@@ -55,4 +55,6 @@ if (result.hasErrors()) {
 }
 ```
 
+Fatal exceptions raised by `process(...)` expose `getJobId()`, allowing callers to correlate the exception with diagnostic events and an optional job log file.
+
 Call `result.throwIfHasErrors()` when the caller wants an `ExcelValidationException` after all rows have been processed. This does not change the already-written valid output.

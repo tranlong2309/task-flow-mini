@@ -2,6 +2,21 @@ package com.company.invoice.xlsx;
 
 /** Base unchecked exception for fatal invoice processing failures. */
 public class InvoiceException extends RuntimeException {
+        /** The optional job identifier associated with this failure. */
+        private String jobId;
+
+        /** 
+         * Associates this exception with a processing job. 
+         * @param value the job identifier
+         * @return this exception
+         */
+        public InvoiceException withJobId(String value) {
+            this.jobId = value;
+            return this;
+        }
+
+        /** @return job id, or null when created outside processing */
+        public String getJobId() { return jobId; }
     private static final long serialVersionUID = 1L;
 
     /**
