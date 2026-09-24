@@ -1,5 +1,7 @@
 package com.taskflow.application.service;
 
+import com.taskflow.infrastructure.web.dto.PagedResponse;
+
 import com.taskflow.application.port.in.CreateTaskUseCase;
 import com.taskflow.application.port.in.DeleteTaskUseCase;
 import com.taskflow.application.port.in.GetBoardPermissionUseCase;
@@ -136,9 +138,9 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
     }
 
     @Override
-    public List<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, Long requesterId) {
+    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, Long requesterId, int page, int size) {
         getBoardPermissionUseCase.getPermissions(boardId, requesterId);
-        return taskRepositoryPort.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly);
+        return taskRepositoryPort.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, page, size);
     }
 
     @Override

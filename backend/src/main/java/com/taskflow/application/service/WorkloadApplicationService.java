@@ -35,7 +35,7 @@ public class WorkloadApplicationService implements GetWorkloadUseCase {
         BoardPermission permission = getBoardPermissionUseCase.getPermissions(boardId, userId);
         boolean isManagerOrAdmin = permission.isCanDeleteBoard(); // simple check, normally manager has more permissions
 
-        List<Task> tasks = taskRepositoryPort.searchTasks(boardId, null, null, null, null, null);
+        List<Task> tasks = taskRepositoryPort.searchTasks(boardId, null, null, null, null, null, 0, 100000).content();
         
         if (!isManagerOrAdmin) {
             tasks = tasks.stream()

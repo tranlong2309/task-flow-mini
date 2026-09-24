@@ -5,6 +5,10 @@ import com.taskflow.application.port.in.DeleteTaskUseCase;
 import com.taskflow.application.port.in.GetTaskUseCase;
 import com.taskflow.application.port.in.SearchTasksUseCase;
 import com.taskflow.application.port.in.UpdateTaskUseCase;
+import com.taskflow.application.port.in.UpdateTaskStatusUseCase;
+import com.taskflow.application.port.in.MoveTaskUseCase;
+import com.taskflow.application.port.in.BlockTaskUseCase;
+import com.taskflow.application.port.in.UnblockTaskUseCase;
 import com.taskflow.domain.model.Priority;
 import com.taskflow.domain.model.Task;
 import com.taskflow.infrastructure.security.CustomUserDetails;
@@ -106,22 +110,27 @@ public class TaskController {
 
     @GetMapping("/boards/{boardId}/tasks")
     public ResponseEntity<?> searchTasks(@PathVariable UUID boardId,
-                                         @RequestParam(required = false) Long statusColumnId,
-                                         @RequestParam(required = false) Long assigneeId,
-                                         @RequestParam(required = false) Priority priority,
-                                         @RequestParam(required = false) String search,
-                                         @RequestParam(required = false) Boolean overdueOnly,
-                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
-        List<Task> tasks = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, userDetails.getId());
-        return ResponseEntity.ok(tasks);
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Long statusColumnId,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Long assigneeId,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean overdueOnly,
+                                           @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+                                           @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
+                                           @AuthenticationPrincipal CustomUserDetails userDetails) {
+        if (size > 100) size = 100;
+        com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, userDetails.getId(), page, size);
+        return ResponseEntity.ok(paged);
     }
 
     @GetMapping("/boards/{boardId}/tasks/search")
     public ResponseEntity<?> searchTasksAdvanced(@PathVariable UUID boardId,
-                                                 @RequestParam(required = false) String q,
-                                                 @RequestParam(required = false) String status,
-                                                 @RequestParam(required = false) Long assigneeId,
-                                                 @RequestParam(required = false) Priority priority,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) String q,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) Long assigneeId,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
+                                                 @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+                                                 @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
                                                  @AuthenticationPrincipal CustomUserDetails userDetails) {
         
         if (q != null && q.length() > 100) {
@@ -142,9 +151,10 @@ public class TaskController {
         Map<Long, String> colMap = columns.stream().collect(java.util.stream.Collectors.toMap(com.taskflow.domain.model.BoardColumn::getId, com.taskflow.domain.model.BoardColumn::getName));
 
         try {
-            List<Task> tasks = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, q, null, userDetails.getId());
+            if (size > 100) size = 100;
+            com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, q, null, userDetails.getId(), page, size);
             
-            List<com.taskflow.domain.model.TaskSearchResult> items = tasks.stream().map(t -> 
+            List<com.taskflow.domain.model.TaskSearchResult> items = paged.content().stream().map(t -> 
                 new com.taskflow.domain.model.TaskSearchResult(
                     t.getId(), 
                     t.getTitle(), 
@@ -155,7 +165,13 @@ public class TaskController {
                 )
             ).collect(java.util.stream.Collectors.toList());
 
-            return ResponseEntity.ok(Map.of("items", items));
+            return ResponseEntity.ok(Map.of(
+                "items", items,
+                "totalElements", paged.totalElements(),
+                "totalPages", paged.totalPages(),
+                "page", paged.page(),
+                "size", paged.size()
+            ));
         } catch (org.springframework.security.access.AccessDeniedException e) {
             return ResponseEntity.status(403).build();
         } catch (IllegalArgumentException e) {

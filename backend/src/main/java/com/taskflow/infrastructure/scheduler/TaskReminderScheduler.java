@@ -17,11 +17,11 @@ import java.util.stream.Collectors;
 @EnableScheduling
 public class TaskReminderScheduler {
 
-    private final SpringDataTaskRepository taskRepository;
+    private final com.taskflow.domain.repository.TaskRepositoryPort taskRepositoryPort;
     private final SendNotificationUseCase sendNotificationUseCase;
 
-    public TaskReminderScheduler(SpringDataTaskRepository taskRepository, SendNotificationUseCase sendNotificationUseCase) {
-        this.taskRepository = taskRepository;
+    public TaskReminderScheduler(com.taskflow.domain.repository.TaskRepositoryPort taskRepositoryPort, SendNotificationUseCase sendNotificationUseCase) {
+        this.taskRepositoryPort = taskRepositoryPort;
         this.sendNotificationUseCase = sendNotificationUseCase;
     }
 
@@ -29,14 +29,11 @@ public class TaskReminderScheduler {
     @Scheduled(cron = "0 0 * * * *")
     public void runReminders() {
         // Find tasks that are not deleted, not completed, not blocked, and have a due date
-        List<com.taskflow.infrastructure.persistence.entity.TaskEntity> entities = taskRepository.findAll().stream()
-                .filter(t -> t.getDeletedAt() == null && t.getCompletedAt() == null && !Boolean.TRUE.equals(t.getIsBlocked()) && t.getDueDate() != null)
-                .collect(Collectors.toList());
-
         Instant now = Instant.now();
+        java.time.Instant upTo = now.plus(8, ChronoUnit.DAYS); // Fetch up to 8 days to cover the 7 days left reminder + 24h requirement
+        List<Task> tasks = taskRepositoryPort.findTasksForReminders(upTo);
 
-        for (com.taskflow.infrastructure.persistence.entity.TaskEntity entity : entities) {
-            Task task = toDomain(entity);
+        for (Task task : tasks) {
             Instant dueDate = task.getDueDate();
             
             if (dueDate.isBefore(now)) {
@@ -55,25 +52,5 @@ public class TaskReminderScheduler {
         runReminders();
     }
 
-    private Task toDomain(com.taskflow.infrastructure.persistence.entity.TaskEntity entity) {
-        return new Task(
-                entity.getId(),
-                entity.getBoardId(),
-                entity.getTitle(),
-                entity.getDescription(),
-                entity.getStatusColumnId(),
-                entity.getAssigneeId(),
-                entity.getPriority(),
-                entity.getDueDate(),
-                entity.getCreatedBy(),
-                entity.getCreatedAt(),
-                entity.getUpdatedAt(),
-                entity.getDeletedAt(),
-                entity.getPosition(),
-                entity.getCompletedAt(),
-                entity.getIsBlocked(),
-                entity.getBlockedReason(),
-                entity.getBlockedAt()
-        );
-    }
+    
 }

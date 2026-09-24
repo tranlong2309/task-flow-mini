@@ -3,6 +3,9 @@ package com.taskflow.infrastructure.persistence.repository;
 import com.taskflow.domain.model.Priority;
 import com.taskflow.domain.model.Task;
 import com.taskflow.domain.repository.TaskRepositoryPort;
+import com.taskflow.infrastructure.web.dto.PagedResponse;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import com.taskflow.infrastructure.persistence.entity.TaskEntity;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
@@ -25,6 +28,10 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
     }
 
     @Override
+    public java.util.List<Task> findTasksForReminders(java.time.Instant upTo) {
+        return springDataTaskRepository.findTasksForReminders(upTo).stream().map(this::toDomain).collect(java.util.stream.Collectors.toList());
+    }
+
     public Task save(Task task) {
         TaskEntity entity = toEntity(task);
         TaskEntity saved = springDataTaskRepository.save(entity);
@@ -49,7 +56,7 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
     }
 
     @Override
-    public List<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly) {
+    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, int page, int size) {
         Specification<TaskEntity> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("boardId"), boardId));
@@ -79,9 +86,56 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
             return cb.and(predicates.toArray(new Predicate[0]));
         };
 
-        return springDataTaskRepository.findAll(spec).stream()
-                .map(this::toDomain)
-                .collect(Collectors.toList());
+        PageRequest pageRequest = PageRequest.of(page, size);
+        Page<TaskEntity> entityPage = springDataTaskRepository.findAll(spec, pageRequest);
+        java.util.List<Task> tasks = entityPage.getContent().stream().map(this::toDomain).collect(Collectors.toList());
+        return new PagedResponse<>(tasks, entityPage.getTotalElements(), entityPage.getTotalPages(), page, size);
+    }
+
+    
+    @Override
+    public java.util.List<Task> searchTasksByBoardIds(java.util.List<UUID> boardIds, Long assigneeId, java.time.Instant from, java.time.Instant to) {
+        Specification<TaskEntity> spec = (root, query, cb) -> {
+            java.util.List<Predicate> predicates = new java.util.ArrayList<>();
+            predicates.add(root.get("boardId").in(boardIds));
+            predicates.add(cb.isNull(root.get("deletedAt")));
+            if (assigneeId != null) {
+                predicates.add(cb.equal(root.get("assigneeId"), assigneeId));
+            }
+            if (from != null) {
+                predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
+            }
+            if (to != null) {
+                predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), to));
+            }
+            return cb.and(predicates.toArray(new Predicate[0]));
+        };
+        return springDataTaskRepository.findAll(spec).stream().map(this::toDomain).collect(Collectors.toList());
+    }
+
+    @Override
+    public long countByBoardId(UUID boardId) {
+        return springDataTaskRepository.countByBoardIdAndDeletedAtIsNull(boardId);
+    }
+
+    @Override
+    public long countByBoardIdAndCompletedAtIsNotNull(UUID boardId) {
+        return springDataTaskRepository.countByBoardIdAndCompletedAtIsNotNullAndDeletedAtIsNull(boardId);
+    }
+
+    @Override
+    public long countByBoardIdAndStatusColumnId(UUID boardId, Long statusColumnId) {
+        return springDataTaskRepository.countByBoardIdAndStatusColumnIdAndDeletedAtIsNull(boardId, statusColumnId);
+    }
+
+    @Override
+    public long countByBoardIdAndIsBlockedTrue(UUID boardId) {
+        return springDataTaskRepository.countByBoardIdAndIsBlockedTrueAndDeletedAtIsNull(boardId);
+    }
+
+    @Override
+    public long countByBoardIdAndDueDateBeforeAndCompletedAtIsNull(UUID boardId, java.time.Instant date) {
+        return springDataTaskRepository.countByBoardIdAndDueDateBeforeAndCompletedAtIsNullAndDeletedAtIsNull(boardId, date);
     }
 
     private TaskEntity toEntity(Task task) {
