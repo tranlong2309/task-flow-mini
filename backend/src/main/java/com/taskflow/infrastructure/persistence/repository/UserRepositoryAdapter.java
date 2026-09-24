@@ -33,4 +33,18 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
             return new User(entity.getId(), entity.getName(), entity.getEmail(), role, teams);
         });
     }
+    @Override
+    public List<User> findByIds(List<Long> ids) {
+        return springDataUserRepository.findAllById(ids).stream().map(entity -> {
+            String role = entity.getRoles().stream()
+                    .map(RoleEntity::getName)
+                    .findFirst()
+                    .orElse("MEMBER");
+            List<Long> teams = entity.getTeams().stream()
+                    .map(TeamEntity::getId)
+                    .collect(Collectors.toList());
+
+            return new User(entity.getId(), entity.getName(), entity.getEmail(), role, teams);
+        }).collect(Collectors.toList());
+    }
 }

@@ -245,7 +245,7 @@ public class TaskIntegrationTest {
                 .andExpect(jsonPath("$.blockedReason").isEmpty())
                 .andExpect(jsonPath("$.completedAt").isNotEmpty()); // Should restore completedAt because it's in Done
 
-        // 5. Delete Task (Soft delete)
+        // 6. Delete Task (Soft delete)
         mockMvc.perform(delete("/api/v1/tasks/" + taskId)
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isNoContent());
@@ -254,5 +254,11 @@ public class TaskIntegrationTest {
         mockMvc.perform(get("/api/v1/tasks/" + taskId)
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isBadRequest());
+                
+        // 7. Workload summary
+        mockMvc.perform(get("/api/v1/boards/" + boardId + "/workload")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.total").isNumber());
     }
 }

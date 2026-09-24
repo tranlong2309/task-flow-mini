@@ -73,6 +73,7 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
             }
             if (Boolean.TRUE.equals(overdueOnly)) {
                 predicates.add(cb.lessThan(root.get("dueDate"), Instant.now()));
+                predicates.add(cb.isNull(root.get("completedAt")));
             }
 
             return cb.and(predicates.toArray(new Predicate[0]));

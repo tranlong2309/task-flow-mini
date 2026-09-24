@@ -17,4 +17,11 @@ public class BoardColumnRepositoryAdapter implements BoardColumnRepositoryPort {
     public Optional<BoardColumn> findById(Long id) {
         return repository.findById(id).map(e -> new BoardColumn(e.getId(), e.getBoardId(), e.getName(), e.getPosition()));
     }
+
+    @Override
+    public List<BoardColumn> findByBoardId(java.util.UUID boardId) {
+        return repository.findByBoardIdOrderByPositionAsc(boardId).stream()
+                .map(e -> new BoardColumn(e.getId(), e.getBoardId(), e.getName(), e.getPosition()))
+                .collect(java.util.stream.Collectors.toList());
+    }
 }

@@ -14,10 +14,14 @@ public class BoardController {
 
     private final CreateBoardUseCase createBoardUseCase;
     private final com.taskflow.application.port.in.GetBoardPermissionUseCase getBoardPermissionUseCase;
+    private final com.taskflow.application.port.in.GetWorkloadUseCase getWorkloadUseCase;
 
-    public BoardController(CreateBoardUseCase createBoardUseCase, com.taskflow.application.port.in.GetBoardPermissionUseCase getBoardPermissionUseCase) {
+    public BoardController(CreateBoardUseCase createBoardUseCase, 
+                           com.taskflow.application.port.in.GetBoardPermissionUseCase getBoardPermissionUseCase,
+                           com.taskflow.application.port.in.GetWorkloadUseCase getWorkloadUseCase) {
         this.createBoardUseCase = createBoardUseCase;
         this.getBoardPermissionUseCase = getBoardPermissionUseCase;
+        this.getWorkloadUseCase = getWorkloadUseCase;
     }
 
     @PostMapping("/boards")
@@ -48,5 +52,20 @@ public class BoardController {
                 "canDeleteBoard", permission.isCanDeleteBoard(),
                 "canViewReport", permission.isCanViewReport()
         ));
+    }
+
+    @GetMapping("/boards/{boardId}/workload")
+    public ResponseEntity<?> getWorkload(
+            @PathVariable java.util.UUID boardId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.taskflow.infrastructure.security.CustomUserDetails userDetails
+    ) {
+        try {
+            com.taskflow.domain.model.BoardWorkloadSummary workload = getWorkloadUseCase.getWorkload(boardId, userDetails.getId());
+            return ResponseEntity.ok(workload);
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN).build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
 }
