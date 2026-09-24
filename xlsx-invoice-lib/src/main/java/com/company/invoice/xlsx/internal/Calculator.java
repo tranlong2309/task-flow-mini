@@ -10,6 +10,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 /** Performs all monetary arithmetic without floating-point arithmetic. */
 public final class Calculator {
@@ -28,34 +29,41 @@ public final class Calculator {
         for (int index = 0; index < items.size(); index++) {
             InvoiceItem item = items.get(index);
             int rowNumber = index + 1;
-            List<RowError> validationErrors = validateItem(item, sheetName, rowNumber);
-            if (!validationErrors.isEmpty()) {
-                errors.addAll(validationErrors);
-                continue;
-            }
-            BigDecimal before = item.quantity().multiply(item.unitPrice()).setScale(config.scale(), config.roundingMode());
-            BigDecimal vat = before.multiply(item.vatRate()).divide(ONE_HUNDRED, config.scale(), config.roundingMode());
-            BigDecimal after = before.add(vat);
-            if (before.signum() < 0 || vat.signum() < 0 || after.signum() < 0) {
-                errors.add(error(sheetName, rowNumber, null, "", ErrorCode.NEGATIVE_AMOUNT,
-                        "calculated amount is negative"));
-                continue;
-            }
-            if (exceedsPrecision(before) || exceedsPrecision(vat) || exceedsPrecision(after)) {
-                errors.add(error(sheetName, rowNumber, null, "", ErrorCode.PRECISION_EXCEEDED,
-                        "calculated amount exceeds Excel's 15 significant digit precision"));
-                continue;
-            }
+            Optional<InvoiceLine> calculation = calculateSingleLine(config, item, sheetName, rowNumber, errors);
+            if (calculation.isEmpty()) continue;
+            InvoiceLine line = calculation.get();
             lineNumber++;
-            lines.add(new InvoiceLine(lineNumber, item.itemName(), item.quantity(), item.unitPrice(), item.vatRate(), before, vat, after));
-            beforeTotal = beforeTotal.add(before);
-            vatTotal = vatTotal.add(vat);
-            afterTotal = afterTotal.add(after);
+            lines.add(new InvoiceLine(lineNumber, line.itemName(), line.quantity(), line.unitPrice(), line.vatRate(), line.amountBeforeVat(), line.vatAmount(), line.amountAfterVat()));
+            beforeTotal = beforeTotal.add(line.amountBeforeVat());
+            vatTotal = vatTotal.add(line.vatAmount());
+            afterTotal = afterTotal.add(line.amountAfterVat());
         }
         if (exceedsPrecision(beforeTotal) || exceedsPrecision(vatTotal) || exceedsPrecision(afterTotal)) {
             throw new com.company.invoice.xlsx.InvoiceException("invoice total exceeds Excel's 15 significant digit precision");
         }
         return new CalculationResult(lines, new InvoiceTotals(beforeTotal, vatTotal, afterTotal), errors);
+    }
+
+    public static Optional<InvoiceLine> calculateSingleLine(InvoiceConfig config, InvoiceItem item, String sheetName, int rowNumber, List<RowError> errors) {
+        List<RowError> validationErrors = validateItem(item, sheetName, rowNumber);
+        if (!validationErrors.isEmpty()) {
+            errors.addAll(validationErrors);
+            return Optional.empty();
+        }
+        BigDecimal before = item.quantity().multiply(item.unitPrice()).setScale(config.scale(), config.roundingMode());
+        BigDecimal vat = before.multiply(item.vatRate()).divide(ONE_HUNDRED, config.scale(), config.roundingMode());
+        BigDecimal after = before.add(vat);
+        if (before.signum() < 0 || vat.signum() < 0 || after.signum() < 0) {
+            errors.add(error(sheetName, rowNumber, null, "", ErrorCode.NEGATIVE_AMOUNT,
+                    "calculated amount is negative"));
+            return Optional.empty();
+        }
+        if (exceedsPrecision(before) || exceedsPrecision(vat) || exceedsPrecision(after)) {
+            errors.add(error(sheetName, rowNumber, null, "", ErrorCode.PRECISION_EXCEEDED,
+                    "calculated amount exceeds Excel's 15 significant digit precision"));
+            return Optional.empty();
+        }
+        return Optional.of(new InvoiceLine(0, item.itemName(), item.quantity(), item.unitPrice(), item.vatRate(), before, vat, after));
     }
 
     private static List<RowError> validateItem(InvoiceItem item, String sheetName, int rowNumber) {

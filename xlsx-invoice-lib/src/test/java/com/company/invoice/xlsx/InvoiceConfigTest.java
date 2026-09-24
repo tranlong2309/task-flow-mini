@@ -20,6 +20,10 @@ class InvoiceConfigTest {
         assertThat(config.scale()).isEqualTo(2);
         assertThat(config.roundingMode()).isEqualTo(RoundingMode.DOWN);
         assertThat(config.headerAliases()).containsEntry("qty", "quantity");
+        assertThat(config.sxssfRowAccessWindowSize()).isEqualTo(100);
+
+        InvoiceConfig customConfig = InvoiceConfig.builder().sxssfRowAccessWindowSize(500).build();
+        assertThat(customConfig.sxssfRowAccessWindowSize()).isEqualTo(500);
     }
 
     @Test
@@ -31,5 +35,7 @@ class InvoiceConfigTest {
         assertThatIllegalArgumentException().isThrownBy(() -> InvoiceConfig.builder().outputSheetName(" ").build());
         assertThatIllegalArgumentException().isThrownBy(() -> InvoiceConfig.builder().outputSheetName("Same").errorSheetName("Same").build());
         assertThatIllegalArgumentException().isThrownBy(() -> InvoiceConfig.builder().tempDirectory(Path.of("relative")).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> InvoiceConfig.builder().sxssfRowAccessWindowSize(0).build());
+        assertThatIllegalArgumentException().isThrownBy(() -> InvoiceConfig.builder().sxssfRowAccessWindowSize(-2).build());
     }
 }

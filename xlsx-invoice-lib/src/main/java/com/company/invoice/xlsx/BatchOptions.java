@@ -37,6 +37,9 @@ public final class BatchOptions {
 
         /** 
          * Sets the maximum concurrency level. Defaults to available processors.
+         * For CPU-bound workloads, the default is optimal.
+         * For I/O-bound workloads (e.g. slow network storage), it is recommended to 
+         * increase this value significantly or use a Virtual Thread-based executor.
          * @param value concurrency level (>= 1)
          * @return this builder
          */

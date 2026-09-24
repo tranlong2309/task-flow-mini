@@ -51,4 +51,25 @@ class LargeWorkbookPerformanceTest {
         
         assertThat(ratio).isBetween(5.0, 15.0);
     }
+
+    @Test
+    void testPerformanceWithHighErrorRate() throws Exception {
+        Path file50kErrors = tempDir.resolve("50k-errors.xlsx");
+        System.out.println("Generating 50k rows with errors...");
+        LargeWorkbookFixtures.generate(file50kErrors, 50_000, true);
+
+        InvoiceProcessor processor = InvoiceProcessor.create(InvoiceConfig.builder()
+                .jobLogDirectory(tempDir.resolve("logs")) // Enable job logging
+                .build());
+
+        System.out.println("Running 50k test with errors...");
+        long start = System.nanoTime();
+        processor.process(file50kErrors, tempDir.resolve("out-50k-errors.xlsx"));
+        long elapsed = (System.nanoTime() - start) / 1_000_000;
+        
+        System.out.println("Elapsed ms for 50k rows with 100% errors: " + elapsed + " ms");
+        // Before optimization, 50k flush() calls to disk would take multiple seconds
+        // (often 10s-30s+ on slow disks). With buffering, it should complete quickly.
+        assertThat(elapsed).isLessThan(15000); // Give generous upper bound for CI
+    }
 }

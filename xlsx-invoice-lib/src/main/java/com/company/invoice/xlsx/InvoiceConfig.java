@@ -28,6 +28,7 @@ public final class InvoiceConfig {
     private final boolean logTotals;
     private final long progressLogInterval;
     private final int logValueMaxLength;
+    private final int sxssfRowAccessWindowSize;
 
     private InvoiceConfig(Builder builder) {
         this.scale = builder.scale;
@@ -46,6 +47,7 @@ public final class InvoiceConfig {
         this.logTotals = builder.logTotals;
         this.progressLogInterval = builder.progressLogInterval;
         this.logValueMaxLength = builder.logValueMaxLength;
+        this.sxssfRowAccessWindowSize = builder.sxssfRowAccessWindowSize;
     }
 
     /**
@@ -72,6 +74,7 @@ public final class InvoiceConfig {
     /** @return whether totals are included in diagnostic logs */ public boolean logTotals() { return logTotals; }
     /** @return progress event interval, or zero when disabled */ public long progressLogInterval() { return progressLogInterval; }
     /** @return maximum logged cell-value length */ public int logValueMaxLength() { return logValueMaxLength; }
+    /** @return SXSSF row access window size */ public int sxssfRowAccessWindowSize() { return sxssfRowAccessWindowSize; }
 
     /** Mutable builder used only while constructing an immutable configuration. */
     public static final class Builder {
@@ -91,6 +94,7 @@ public final class InvoiceConfig {
         private boolean logTotals;
         private long progressLogInterval = 10_000;
         private int logValueMaxLength = 100;
+        private int sxssfRowAccessWindowSize = 100;
 
         /**
          * Sets the monetary scale.
@@ -191,6 +195,13 @@ public final class InvoiceConfig {
          * @return this builder 
          */
         public Builder logValueMaxLength(int value) { this.logValueMaxLength = value; return this; }
+        
+        /** 
+         * Sets the SXSSF row access window size.
+         * @param value SXSSF row access window size (-1 for unlimited, >0 for limited)
+         * @return this builder 
+         */
+        public Builder sxssfRowAccessWindowSize(int value) { this.sxssfRowAccessWindowSize = value; return this; }
 
         /**
          * Builds and validates the immutable configuration.
@@ -205,6 +216,7 @@ public final class InvoiceConfig {
             if (maxInputBytes < 1) throw new IllegalArgumentException("maxInputBytes must be positive");
             if (progressLogInterval < 0) throw new IllegalArgumentException("progressLogInterval must not be negative");
             if (logValueMaxLength < 1) throw new IllegalArgumentException("logValueMaxLength must be positive");
+            if (sxssfRowAccessWindowSize < -1 || sxssfRowAccessWindowSize == 0) throw new IllegalArgumentException("sxssfRowAccessWindowSize must be -1 or > 0");
             requireName(outputSheetName, "outputSheetName");
             requireName(errorSheetName, "errorSheetName");
             if (outputSheetName.equals(errorSheetName)) throw new IllegalArgumentException("sheet names must differ");

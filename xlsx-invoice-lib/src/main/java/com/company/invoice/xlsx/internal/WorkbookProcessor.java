@@ -27,6 +27,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.UUID;
 import org.apache.poi.openxml4j.opc.OPCPackage;
 import org.apache.poi.openxml4j.opc.PackageAccess;
@@ -122,23 +123,42 @@ public final class WorkbookProcessor {
             ReadOnlySharedStringsTable sharedStrings = new ReadOnlySharedStringsTable(packageHandle);
             StylesTable styles = reader.getStylesTable();
             XSSFReader.SheetIterator sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
-            int selectedIndex = selectSheet(reader, sheets);
-            sheets = (XSSFReader.SheetIterator) reader.getSheetsData();
+            
             String sheetName = null;
             InputStream sheetStream = null;
+            List<String> names = new ArrayList<>();
             int currentIndex = 0;
+            
             while (sheets.hasNext()) {
                 InputStream candidate = sheets.next();
                 String candidateName = sheets.getSheetName();
-                if (currentIndex == selectedIndex || (config.sheetName() != null && config.sheetName().equals(candidateName))) {
+                names.add(candidateName);
+                
+                boolean match = false;
+                if (config.sheetName() != null) {
+                    match = config.sheetName().equals(candidateName);
+                } else if (config.sheetIndex() != null) {
+                    match = currentIndex == config.sheetIndex();
+                } else {
+                    match = currentIndex == 0;
+                }
+                
+                if (match && sheetStream == null) {
                     sheetName = candidateName;
                     sheetStream = candidate;
-                    break;
+                } else {
+                    candidate.close();
                 }
-                candidate.close();
                 currentIndex++;
             }
-            if (sheetStream == null) throw new ExcelFormatException("selected sheet was not found");
+            
+            if (sheetStream == null) {
+                if (names.isEmpty()) throw new ExcelFormatException("workbook contains no sheets");
+                if (config.sheetName() != null) throw new ExcelFormatException("sheet '" + config.sheetName() + "' was not found; available sheets: " + names);
+                if (config.sheetIndex() != null) throw new ExcelFormatException("sheet index " + config.sheetIndex() + " was not found; available sheets: " + names);
+                throw new ExcelFormatException("selected sheet was not found");
+            }
+            
             InputStream selectedSheet = sheetStream;
             try (selectedSheet) {
                 ProcessingHandler handler = new ProcessingHandler(config, sheetName, temporaryOutput, execution);
@@ -153,30 +173,6 @@ public final class WorkbookProcessor {
         }
     }
 
-    private int selectSheet(XSSFReader reader, XSSFReader.SheetIterator sheets) throws IOException {
-        List<String> names = new ArrayList<>();
-        while (sheets.hasNext()) {
-            InputStream sheetStream = sheets.next();
-            try {
-                names.add(sheets.getSheetName());
-            } finally {
-                sheetStream.close();
-            }
-        }
-        if (config.sheetName() != null) {
-            int index = names.indexOf(config.sheetName());
-            if (index < 0) throw new ExcelFormatException("sheet '" + config.sheetName() + "' was not found; available sheets: " + names);
-            return index;
-        }
-        if (config.sheetIndex() != null) {
-            if (config.sheetIndex() < 0 || config.sheetIndex() >= names.size()) {
-                throw new ExcelFormatException("sheet index " + config.sheetIndex() + " was not found; available sheets: " + names);
-            }
-            return config.sheetIndex();
-        }
-        if (names.isEmpty()) throw new ExcelFormatException("workbook contains no sheets");
-        return 0;
-    }
 
     private void validateInputFile(Path input) throws IOException {
         if (!Files.isRegularFile(input)) throw new ExcelFormatException("input workbook does not exist");
@@ -325,14 +321,15 @@ public final class WorkbookProcessor {
                 execution.progress(dataRowCount, processedRowCount, skippedRowCount);
                 return;
             }
-            Calculator.CalculationResult calculation = Calculator.calculate(handlerConfig, List.of(new InvoiceItem(itemName, quantity, unitPrice, vatRate)), sheetName);
-            if (!calculation.errors().isEmpty()) {
-                addErrors(calculation.errors());
+            List<RowError> calculationErrors = new ArrayList<>();
+            Optional<InvoiceLine> calculation = Calculator.calculateSingleLine(handlerConfig, new InvoiceItem(itemName, quantity, unitPrice, vatRate), sheetName, currentRow, calculationErrors);
+            if (calculation.isEmpty()) {
+                addErrors(calculationErrors);
                 skippedRowCount++;
                 execution.progress(dataRowCount, processedRowCount, skippedRowCount);
                 return;
             }
-            InvoiceLine line = calculation.lines().get(0);
+            InvoiceLine line = calculation.get();
             line = new InvoiceLine(++outputLineNumber, line.itemName(), line.quantity(), line.unitPrice(), line.vatRate(), line.amountBeforeVat(), line.vatAmount(), line.amountAfterVat());
             writer.writeLine(line, handlerConfig.scale());
             processedRowCount++;

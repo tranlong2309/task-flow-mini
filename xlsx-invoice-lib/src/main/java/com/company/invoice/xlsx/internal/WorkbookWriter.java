@@ -30,7 +30,7 @@ public final class WorkbookWriter implements AutoCloseable {
     private int rowIndex;
 
     public WorkbookWriter(InvoiceConfig config) {
-        workbook = new SXSSFWorkbook(100);
+        workbook = new SXSSFWorkbook(config.sxssfRowAccessWindowSize());
         workbook.setCompressTempFiles(true);
         invoiceSheet = workbook.createSheet(config.outputSheetName());
         invoiceSheet.createFreezePane(0, 1);

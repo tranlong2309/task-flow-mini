@@ -61,18 +61,21 @@ public final class JobExecution implements AutoCloseable {
     }
 
     public void header(String sheet, int row, String mapping, int ignored) {
+        if (!LOG.isInfoEnabled() && jobWriter == null) return;
         sameEvent("INFO", "header.detected", "sheet=" + quote(sheet), "headerRow=" + row,
                 "mapping=" + quote(mapping), "ignoredColumns=" + ignored);
     }
 
     public void progress(long dataRows, long processedRows, long skippedRows) {
         if (config.progressLogInterval() > 0 && dataRows % config.progressLogInterval() == 0) {
+            if (!LOG.isDebugEnabled() && jobWriter == null) return;
             sameEvent("DEBUG", "job.progress", "dataRows=" + dataRows, "processedRows=" + processedRows,
                     "skippedRows=" + skippedRows);
         }
     }
 
     public void rowError(RowError error) {
+        if (!LOG.isDebugEnabled() && jobWriter == null) return;
         event("DEBUG", "WARN", "row.error", "row=" + error.rowNumber(), "cell=" + quote(error.cellAddress()),
                 "column=" + quote(error.columnName()), "code=" + error.errorCode(),
                 "value=" + quote(error.offendingValue()), "message=" + quote(error.message()));
@@ -144,7 +147,6 @@ public final class JobExecution implements AutoCloseable {
             jobWriter.write(TIMESTAMP.format(Instant.now()) + " " + String.format("%-5s", level) + " [" + jobId + "] " + event);
             for (String field : fields) jobWriter.write(" " + field);
             jobWriter.newLine();
-            jobWriter.flush();
         } catch (IOException exception) {
             closeWriter();
             LOG.warn("joblog.write.failed directory={} reason={}",
@@ -189,6 +191,9 @@ public final class JobExecution implements AutoCloseable {
     @Override
     public void close() {
         if (!ended) sameEvent("INFO", "job.end", "status=FAILED", "elapsedMs=" + elapsedMillis());
+        if (jobWriter != null) {
+            try { jobWriter.flush(); } catch (IOException ignored) {}
+        }
         closeWriter();
         restoreMdc("invoiceJobId", previousJobId);
         restoreMdc("invoiceCorrelationId", previousCorrelationId);
