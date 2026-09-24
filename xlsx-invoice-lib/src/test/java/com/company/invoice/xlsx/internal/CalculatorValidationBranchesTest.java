@@ -18,7 +18,7 @@ class CalculatorValidationBranchesTest {
                 new InvoiceItem("vat", BigDecimal.ONE, BigDecimal.ONE, new BigDecimal("101")),
                 new InvoiceItem("decimals", new BigDecimal("1.0001"), BigDecimal.ONE, BigDecimal.ZERO));
 
-        Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(), items, "Items");
+        Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(), items);
 
         assertThat(result.errors()).extracting(error -> error.errorCode())
                 .containsExactly(ErrorCode.OUT_OF_RANGE, ErrorCode.OUT_OF_RANGE, ErrorCode.OUT_OF_RANGE,

@@ -34,7 +34,7 @@ class CalculatorTest {
 
     @Test
     void rejectsNullItemsAndTotalPrecisionOverflow() {
-        Calculator.CalculationResult nullResult = Calculator.calculate(InvoiceConfig.builder().build(), Arrays.asList((InvoiceItem) null), "Items");
+        Calculator.CalculationResult nullResult = Calculator.calculate(InvoiceConfig.builder().build(), Arrays.asList((InvoiceItem) null));
         assertThat(nullResult.errors()).extracting(error -> error.errorCode()).containsExactly(ErrorCode.MISSING_VALUE);
 
         List<InvoiceItem> largeInvoice = new ArrayList<>();
@@ -42,7 +42,7 @@ class CalculatorTest {
             largeInvoice.add(new InvoiceItem("large-" + index, BigDecimal.ONE,
                     new BigDecimal("9000000000000"), BigDecimal.ZERO));
         }
-        assertThatThrownBy(() -> Calculator.calculate(InvoiceConfig.builder().build(), largeInvoice, "Items"))
+        assertThatThrownBy(() -> Calculator.calculate(InvoiceConfig.builder().build(), largeInvoice))
                 .isInstanceOf(com.company.invoice.xlsx.InvoiceException.class);
     }
 }

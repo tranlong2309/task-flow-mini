@@ -112,7 +112,11 @@ public final class WorkbookProcessor {
     }
 
     public static Invoice calculate(InvoiceConfig config, List<InvoiceItem> items) {
-        Calculator.CalculationResult result = Calculator.calculate(config, items, "memory");
+        Calculator.CalculationResult rawResult = Calculator.calculate(config, items);
+        List<RowError> mappedErrors = rawResult.errors().stream()
+                .map(e -> new RowError("memory", e.row(), e.cell(), e.column(), e.value(), e.code(), e.message()))
+                .toList();
+        Calculator.CalculationResult result = new Calculator.CalculationResult(rawResult.lines(), rawResult.totals(), mappedErrors);
         return new Invoice(result.lines(), result.totals(), result.errors());
     }
 
