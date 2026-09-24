@@ -6,8 +6,16 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.List;
 import org.junit.jupiter.api.Test;
+import com.company.invoice.xlsx.error.ErrorCode;
+import com.company.invoice.xlsx.model.Invoice;
+import com.company.invoice.xlsx.model.InvoiceItem;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.model.RowError;
 
 class InvoiceProcessorTest {
+    /**
+     * @Author: ThachLN Also check the case where the decimal part consists entirely of zeros; in that case, there is no need to return the `.00` part.
+     */
     @Test
     void calculatesSpecificationExample() {
         InvoiceProcessor processor = InvoiceProcessor.create(InvoiceConfig.builder().build());
@@ -20,6 +28,10 @@ class InvoiceProcessorTest {
         assertThat(invoice.lines()).hasSize(3);
         assertThat(invoice.totals()).isEqualTo(new InvoiceTotals(
                 new BigDecimal("31500000.00"), new BigDecimal("3080000.00"), new BigDecimal("34580000.00")));
+
+        assertThat(invoice.totals()).isEqualTo(new InvoiceTotals(
+                new BigDecimal("31500000"), new BigDecimal("3080000"), new BigDecimal("34580000")));
+
         assertThat(invoice.errors()).isEmpty();
     }
 

@@ -6,7 +6,14 @@ import java.util.Set;
 
 @Entity
 @Table(name = "users")
-public class UserEntity {
+public class UserEntity implements org.springframework.data.domain.Persistable<Long> {
+
+    @jakarta.persistence.Transient
+    private boolean isNew = true;
+
+    @jakarta.persistence.Version
+    private Long version;
+
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,7 +31,7 @@ public class UserEntity {
     @Column(name = "created_at")
     private Instant createdAt;
 
-    @ManyToMany(fetch = FetchType.EAGER)
+    @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
         name = "user_roles",
         joinColumns = @JoinColumn(name = "user_id"),
@@ -56,4 +63,15 @@ public class UserEntity {
     public void setRoles(Set<RoleEntity> roles) { this.roles = roles; }
     public Set<TeamEntity> getTeams() { return teams; }
     public void setTeams(Set<TeamEntity> teams) { this.teams = teams; }
+
+    @Override
+    public boolean isNew() {
+        return isNew;
+    }
+
+    @jakarta.persistence.PrePersist
+    @jakarta.persistence.PostLoad
+    void markNotNew() {
+        this.isNew = false;
+    }
 }

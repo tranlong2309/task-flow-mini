@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.batch;
 
 import java.util.List;
 

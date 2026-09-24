@@ -4,6 +4,7 @@ import java.math.RoundingMode;
 import java.nio.file.Path;
 import java.util.Map;
 import java.util.Objects;
+import com.company.invoice.xlsx.model.Invoice;
 
 /** Immutable configuration for {@link InvoiceProcessor}. */
 public final class InvoiceConfig {

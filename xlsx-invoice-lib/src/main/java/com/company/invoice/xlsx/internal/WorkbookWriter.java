@@ -1,10 +1,10 @@
 package com.company.invoice.xlsx.internal;
 
-import com.company.invoice.xlsx.ColumnMapping;
+import com.company.invoice.xlsx.model.ColumnMapping;
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceLine;
-import com.company.invoice.xlsx.InvoiceTotals;
-import com.company.invoice.xlsx.RowError;
+import com.company.invoice.xlsx.model.InvoiceLine;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.model.RowError;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.math.BigDecimal;

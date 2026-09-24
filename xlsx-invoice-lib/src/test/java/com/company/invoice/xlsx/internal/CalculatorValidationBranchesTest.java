@@ -2,9 +2,9 @@ package com.company.invoice.xlsx.internal;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.company.invoice.xlsx.ErrorCode;
+import com.company.invoice.xlsx.error.ErrorCode;
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceItem;
+import com.company.invoice.xlsx.model.InvoiceItem;
 import java.math.BigDecimal;
 import java.util.List;
 import org.junit.jupiter.api.Test;

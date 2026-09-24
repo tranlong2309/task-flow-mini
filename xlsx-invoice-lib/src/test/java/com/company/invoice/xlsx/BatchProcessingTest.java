@@ -14,6 +14,11 @@ import org.apache.poi.xssf.usermodel.XSSFWorkbook;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
+import com.company.invoice.xlsx.batch.BatchJob;
+import com.company.invoice.xlsx.batch.BatchJobSkippedException;
+import com.company.invoice.xlsx.batch.BatchOptions;
+import com.company.invoice.xlsx.batch.BatchResult;
+import com.company.invoice.xlsx.error.ExcelFormatException;
 
 class BatchProcessingTest {
 

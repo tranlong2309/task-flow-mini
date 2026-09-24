@@ -1,17 +1,17 @@
 package com.company.invoice.xlsx.internal;
 
-import com.company.invoice.xlsx.ColumnMapping;
-import com.company.invoice.xlsx.ErrorCode;
-import com.company.invoice.xlsx.ExcelFormatException;
-import com.company.invoice.xlsx.Invoice;
+import com.company.invoice.xlsx.model.ColumnMapping;
+import com.company.invoice.xlsx.error.ErrorCode;
+import com.company.invoice.xlsx.error.ExcelFormatException;
+import com.company.invoice.xlsx.model.Invoice;
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceException;
-import com.company.invoice.xlsx.InvoiceItem;
-import com.company.invoice.xlsx.InvoiceLine;
-import com.company.invoice.xlsx.InvoiceTotals;
-import com.company.invoice.xlsx.InvoiceIoException;
+import com.company.invoice.xlsx.error.InvoiceException;
+import com.company.invoice.xlsx.model.InvoiceItem;
+import com.company.invoice.xlsx.model.InvoiceLine;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.error.InvoiceIoException;
 import com.company.invoice.xlsx.ProcessingResult;
-import com.company.invoice.xlsx.RowError;
+import com.company.invoice.xlsx.model.RowError;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.OutputStream;
@@ -325,10 +325,12 @@ public final class WorkbookProcessor {
                 execution.progress(dataRowCount, processedRowCount, skippedRowCount);
                 return;
             }
-            List<RowError> calculationErrors = new ArrayList<>();
-            Optional<InvoiceLine> calculation = Calculator.calculateSingleLine(handlerConfig, new InvoiceItem(itemName, quantity, unitPrice, vatRate), sheetName, currentRow, calculationErrors);
+            List<RowError> rawCalcErrors = new ArrayList<>();
+            Optional<InvoiceLine> calculation = Calculator.calculateSingleLine(handlerConfig, new InvoiceItem(itemName, quantity, unitPrice, vatRate), currentRow, rawCalcErrors);
             if (calculation.isEmpty()) {
-                addErrors(calculationErrors);
+                addErrors(rawCalcErrors.stream()
+                    .map(e -> new RowError(sheetName, e.row(), e.cell(), e.column(), e.value(), e.code(), e.message()))
+                    .toList());
                 skippedRowCount++;
                 execution.progress(dataRowCount, processedRowCount, skippedRowCount);
                 return;

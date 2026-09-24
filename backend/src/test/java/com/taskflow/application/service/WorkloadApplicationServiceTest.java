@@ -19,6 +19,10 @@ import org.mockito.MockitoAnnotations;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
 import java.util.List;
+import com.taskflow.infrastructure.web.dto.PagedResponse;
+import static org.mockito.ArgumentMatchers.anyInt;
+import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import java.util.Optional;
 import java.util.UUID;
 
@@ -64,8 +68,8 @@ class WorkloadApplicationServiceTest {
         Task task2 = new Task(UUID.randomUUID(), boardId, "T2", "Desc", 1L, 3L, Priority.HIGH, Instant.now().plus(1, ChronoUnit.DAYS), 1L, Instant.now(), Instant.now(), null, 1, null, true, "blocked", Instant.now()); // Blocked
         Task task3 = new Task(UUID.randomUUID(), boardId, "T3", "Desc", 2L, 2L, Priority.HIGH, past, 1L, Instant.now(), Instant.now(), null, 0, Instant.now(), false, null, null); // Done
 
-        when(taskRepositoryPort.searchTasks(boardId, null, null, null, null, null))
-                .thenReturn(List.of(task1, task2, task3));
+        when(taskRepositoryPort.searchTasks(eq(boardId), isNull(), isNull(), isNull(), isNull(), isNull(), anyInt(), anyInt()))
+                .thenReturn(new PagedResponse<>(List.of(task1, task2, task3), 3, 1, 0, 100000));
 
         User user2 = new User(2L, "User 2", "user2@test.com", "MEMBER", List.of());
         User user3 = new User(3L, "User 3", "user3@test.com", "MEMBER", List.of());

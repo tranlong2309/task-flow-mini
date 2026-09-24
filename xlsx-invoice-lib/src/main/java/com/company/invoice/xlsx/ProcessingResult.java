@@ -3,6 +3,10 @@ package com.company.invoice.xlsx;
 import java.util.List;
 import java.nio.file.Path;
 import java.util.Optional;
+import com.company.invoice.xlsx.error.ExcelValidationException;
+import com.company.invoice.xlsx.model.ColumnMapping;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.model.RowError;
 
 /** Bounded-memory result of a workbook processing call. */
 public record ProcessingResult(InvoiceTotals totals, long dataRowCount, long processedRowCount,

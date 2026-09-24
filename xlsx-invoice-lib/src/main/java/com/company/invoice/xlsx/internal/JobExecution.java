@@ -1,10 +1,10 @@
 package com.company.invoice.xlsx.internal;
 
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceException;
+import com.company.invoice.xlsx.error.InvoiceException;
 import com.company.invoice.xlsx.JobContext;
 import com.company.invoice.xlsx.ProcessingResult;
-import com.company.invoice.xlsx.RowError;
+import com.company.invoice.xlsx.model.RowError;
 import java.io.BufferedWriter;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;

@@ -1,5 +1,7 @@
 package com.taskflow.infrastructure.persistence.repository;
 
+import java.util.List;
+
 import com.taskflow.domain.model.BoardColumn;
 import com.taskflow.domain.repository.BoardColumnRepositoryPort;
 import org.springframework.stereotype.Component;

@@ -5,6 +5,7 @@ import com.taskflow.domain.repository.UserRepositoryPort;
 import com.taskflow.infrastructure.persistence.entity.RoleEntity;
 import com.taskflow.infrastructure.persistence.entity.TeamEntity;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Optional;
@@ -20,6 +21,7 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Optional<User> findById(Long id) {
         return springDataUserRepository.findById(id).map(entity -> {
             String role = entity.getRoles().stream()
@@ -34,6 +36,7 @@ public class UserRepositoryAdapter implements UserRepositoryPort {
         });
     }
     @Override
+    @Transactional(readOnly = true)
     public List<User> findByIds(List<Long> ids) {
         return springDataUserRepository.findAllById(ids).stream().map(entity -> {
             String role = entity.getRoles().stream()

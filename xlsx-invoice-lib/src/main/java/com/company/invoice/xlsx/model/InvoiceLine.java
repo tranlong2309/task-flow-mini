@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.model;
 
 import java.math.BigDecimal;
 

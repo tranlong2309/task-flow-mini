@@ -33,35 +33,13 @@ public class ReportApplicationService implements GetReportUseCase {
     @Override
     public BoardReportSummary getBoardSummary(UUID boardId, Long userId) {
         // Assume permissions checked at controller level or using another service (can reuse GetBoardPermissionUseCase but it's fine for now, we'll check it in controller)
-        List<Task> tasks = taskRepositoryPort.searchTasks(boardId, null, null, null, null, null);
+        
+        long totalTasks = taskRepositoryPort.countByBoardId(boardId);
+        long done = taskRepositoryPort.countByBoardIdAndCompletedAtIsNotNull(boardId);
+        long inProgress = totalTasks - done;
+        long blocked = taskRepositoryPort.countByBoardIdAndIsBlockedTrue(boardId);
+        long overdue = taskRepositoryPort.countByBoardIdAndDueDateBeforeAndCompletedAtIsNull(boardId, Instant.now());
 
-        Map<Long, String> columnNames = boardColumnRepositoryPort.findByBoardId(boardId).stream()
-                .collect(Collectors.toMap(BoardColumn::getId, BoardColumn::getName));
-
-        long totalTasks = tasks.size();
-        long done = 0;
-        long inProgress = 0;
-        long blocked = 0;
-        long overdue = 0;
-
-        Instant now = Instant.now();
-
-        for (Task task : tasks) {
-            boolean isDone = task.getCompletedAt() != null;
-            if (isDone) {
-                done++;
-            } else {
-                inProgress++;
-            }
-
-            if (Boolean.TRUE.equals(task.getIsBlocked())) {
-                blocked++;
-            }
-
-            if (!isDone && task.getDueDate() != null && task.getDueDate().isBefore(now)) {
-                overdue++;
-            }
-        }
 
         double completionRate = calculateCompletionRate(done, totalTasks);
 
@@ -72,25 +50,10 @@ public class ReportApplicationService implements GetReportUseCase {
     public TeamReportSummary getTeamReport(Long teamId, Long assigneeId, String from, String to, Long userId) {
         List<Board> boards = boardRepositoryPort.findByTeamId(teamId);
         
-        List<Task> allTasks = new ArrayList<>();
-        for (Board board : boards) {
-            // Note: date range filter (from/to) not strictly pushed to DB here for simplicity, but in a real app we'd use Specifications
-            List<Task> boardTasks = taskRepositoryPort.searchTasks(board.getId(), null, assigneeId, null, null, null);
-            allTasks.addAll(boardTasks);
-        }
-
-        // Apply date range filter in memory
+        java.util.List<UUID> boardIds = boards.stream().map(Board::getId).collect(Collectors.toList());
         Instant fromInstant = from != null ? Instant.parse(from + "T00:00:00Z") : null;
         Instant toInstant = to != null ? Instant.parse(to + "T23:59:59Z") : null;
-
-        if (fromInstant != null || toInstant != null) {
-            allTasks = allTasks.stream().filter(t -> {
-                Instant date = t.getCreatedAt();
-                if (fromInstant != null && date.isBefore(fromInstant)) return false;
-                if (toInstant != null && date.isAfter(toInstant)) return false;
-                return true;
-            }).collect(Collectors.toList());
-        }
+        List<Task> allTasks = boardIds.isEmpty() ? new java.util.ArrayList<>() : taskRepositoryPort.searchTasksByBoardIds(boardIds, assigneeId, fromInstant, toInstant);
 
         long totalTasks = allTasks.size();
         long done = 0;

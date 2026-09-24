@@ -28,6 +28,8 @@ class TaskApplicationServiceTest {
     private TaskRepositoryPort taskRepositoryPort;
     @Mock
     private TaskHistoryRepositoryPort taskHistoryRepositoryPort;
+    @org.mockito.Mock
+    private com.taskflow.application.port.in.SendNotificationUseCase sendNotificationUseCase;
     @Mock
     private BoardMemberRepositoryPort boardMemberRepositoryPort;
     @Mock

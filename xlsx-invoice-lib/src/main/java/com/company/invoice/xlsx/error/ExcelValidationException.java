@@ -1,6 +1,8 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.error;
 
 import java.util.List;
+import com.company.invoice.xlsx.model.Invoice;
+import com.company.invoice.xlsx.model.RowError;
 
 /** Optional exception view of row errors collected during processing. */
 public final class ExcelValidationException extends InvoiceException {

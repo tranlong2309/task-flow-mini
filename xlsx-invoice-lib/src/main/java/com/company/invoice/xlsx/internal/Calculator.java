@@ -1,16 +1,17 @@
 package com.company.invoice.xlsx.internal;
 
-import com.company.invoice.xlsx.ErrorCode;
+import com.company.invoice.xlsx.error.ErrorCode;
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceItem;
-import com.company.invoice.xlsx.InvoiceLine;
-import com.company.invoice.xlsx.InvoiceTotals;
-import com.company.invoice.xlsx.RowError;
+import com.company.invoice.xlsx.model.InvoiceItem;
+import com.company.invoice.xlsx.model.InvoiceLine;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.model.RowError;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import com.company.invoice.xlsx.error.InvoiceException;
 
 /** Performs all monetary arithmetic without floating-point arithmetic. */
 public final class Calculator {
@@ -29,7 +30,7 @@ public final class Calculator {
         for (int index = 0; index < items.size(); index++) {
             InvoiceItem item = items.get(index);
             int rowNumber = index + 1;
-            Optional<InvoiceLine> calculation = calculateSingleLine(config, item, sheetName, rowNumber, errors);
+            Optional<InvoiceLine> calculation = calculateSingleLine(config, item, rowNumber, errors);
             if (calculation.isEmpty()) continue;
             InvoiceLine line = calculation.get();
             lineNumber++;
@@ -44,7 +45,7 @@ public final class Calculator {
         return new CalculationResult(lines, new InvoiceTotals(beforeTotal, vatTotal, afterTotal), errors);
     }
 
-    public static Optional<InvoiceLine> calculateSingleLine(InvoiceConfig config, InvoiceItem item, String sheetName, int rowNumber, List<RowError> errors) {
+    public static Optional<InvoiceLine> calculateSingleLine(InvoiceConfig config, InvoiceItem item, int rowNumber, List<RowError> errors) {
         List<RowError> validationErrors = validateItem(item, rowNumber);
         if (!validationErrors.isEmpty()) {
             errors.addAll(validationErrors);
