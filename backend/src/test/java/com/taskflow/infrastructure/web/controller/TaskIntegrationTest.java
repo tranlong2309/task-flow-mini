@@ -260,5 +260,16 @@ public class TaskIntegrationTest {
                 .header("Authorization", "Bearer " + userToken))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.summary.total").isNumber());
+
+        // 8. Advanced Search
+        mockMvc.perform(get("/api/v1/boards/" + boardId + "/tasks/search?q=test&status=TODO")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk());
+                
+        // 9. Query length validation
+        String longQuery = "a".repeat(101);
+        mockMvc.perform(get("/api/v1/boards/" + boardId + "/tasks/search?q=" + longQuery)
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isBadRequest());
     }
 }

@@ -31,6 +31,7 @@ public class TaskController {
     private final MoveTaskUseCase moveTaskUseCase;
     private final BlockTaskUseCase blockTaskUseCase;
     private final UnblockTaskUseCase unblockTaskUseCase;
+    private final com.taskflow.domain.repository.BoardColumnRepositoryPort boardColumnRepositoryPort;
 
     public TaskController(CreateTaskUseCase createTaskUseCase,
                           UpdateTaskUseCase updateTaskUseCase,
@@ -40,7 +41,8 @@ public class TaskController {
                           UpdateTaskStatusUseCase updateTaskStatusUseCase,
                           MoveTaskUseCase moveTaskUseCase,
                           BlockTaskUseCase blockTaskUseCase,
-                          UnblockTaskUseCase unblockTaskUseCase) {
+                          UnblockTaskUseCase unblockTaskUseCase,
+                          com.taskflow.domain.repository.BoardColumnRepositoryPort boardColumnRepositoryPort) {
         this.createTaskUseCase = createTaskUseCase;
         this.updateTaskUseCase = updateTaskUseCase;
         this.getTaskUseCase = getTaskUseCase;
@@ -50,6 +52,7 @@ public class TaskController {
         this.moveTaskUseCase = moveTaskUseCase;
         this.blockTaskUseCase = blockTaskUseCase;
         this.unblockTaskUseCase = unblockTaskUseCase;
+        this.boardColumnRepositoryPort = boardColumnRepositoryPort;
     }
 
     @PostMapping("/tasks")
@@ -111,6 +114,53 @@ public class TaskController {
                                          @AuthenticationPrincipal CustomUserDetails userDetails) {
         List<Task> tasks = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, userDetails.getId());
         return ResponseEntity.ok(tasks);
+    }
+
+    @GetMapping("/boards/{boardId}/tasks/search")
+    public ResponseEntity<?> searchTasksAdvanced(@PathVariable UUID boardId,
+                                                 @RequestParam(required = false) String q,
+                                                 @RequestParam(required = false) String status,
+                                                 @RequestParam(required = false) Long assigneeId,
+                                                 @RequestParam(required = false) Priority priority,
+                                                 @AuthenticationPrincipal CustomUserDetails userDetails) {
+        
+        if (q != null && q.length() > 100) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Query string cannot exceed 100 characters"));
+        }
+
+        Long statusColumnId = null;
+        List<com.taskflow.domain.model.BoardColumn> columns = boardColumnRepositoryPort.findByBoardId(boardId);
+        
+        if (status != null) {
+            statusColumnId = columns.stream()
+                    .filter(c -> c.getName().equalsIgnoreCase(status))
+                    .map(com.taskflow.domain.model.BoardColumn::getId)
+                    .findFirst()
+                    .orElse(-1L); // Not found -> non-existent column to return empty
+        }
+
+        Map<Long, String> colMap = columns.stream().collect(java.util.stream.Collectors.toMap(com.taskflow.domain.model.BoardColumn::getId, com.taskflow.domain.model.BoardColumn::getName));
+
+        try {
+            List<Task> tasks = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, q, null, userDetails.getId());
+            
+            List<com.taskflow.domain.model.TaskSearchResult> items = tasks.stream().map(t -> 
+                new com.taskflow.domain.model.TaskSearchResult(
+                    t.getId(), 
+                    t.getTitle(), 
+                    colMap.getOrDefault(t.getStatusColumnId(), "UNKNOWN"), 
+                    t.getAssigneeId(), 
+                    t.getPriority(), 
+                    t.getDueDate()
+                )
+            ).collect(java.util.stream.Collectors.toList());
+
+            return ResponseEntity.ok(Map.of("items", items));
+        } catch (org.springframework.security.access.AccessDeniedException e) {
+            return ResponseEntity.status(403).build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
     }
     
     @DeleteMapping("/tasks/{taskId}")
