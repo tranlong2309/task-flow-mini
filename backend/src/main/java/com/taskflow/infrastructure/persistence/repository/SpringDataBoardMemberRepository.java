@@ -11,4 +11,5 @@ import java.util.UUID;
 @Repository
 public interface SpringDataBoardMemberRepository extends JpaRepository<BoardMemberEntity, BoardMemberId> {
     Optional<BoardMemberEntity> findByBoardIdAndUserId(UUID boardId, Long userId);
+    java.util.List<BoardMemberEntity> findByBoardIdAndRoleNameIn(UUID boardId, java.util.List<String> roles);
 }

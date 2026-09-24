@@ -29,15 +29,18 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
     private final TaskHistoryRepositoryPort taskHistoryRepositoryPort;
     private final BoardMemberRepositoryPort boardMemberRepositoryPort;
     private final GetBoardPermissionUseCase getBoardPermissionUseCase;
+    private final com.taskflow.application.port.in.SendNotificationUseCase sendNotificationUseCase;
 
     public TaskApplicationService(TaskRepositoryPort taskRepositoryPort,
                                   TaskHistoryRepositoryPort taskHistoryRepositoryPort,
                                   BoardMemberRepositoryPort boardMemberRepositoryPort,
-                                  GetBoardPermissionUseCase getBoardPermissionUseCase) {
+                                  GetBoardPermissionUseCase getBoardPermissionUseCase,
+                                  com.taskflow.application.port.in.SendNotificationUseCase sendNotificationUseCase) {
         this.taskRepositoryPort = taskRepositoryPort;
         this.taskHistoryRepositoryPort = taskHistoryRepositoryPort;
         this.boardMemberRepositoryPort = boardMemberRepositoryPort;
         this.getBoardPermissionUseCase = getBoardPermissionUseCase;
+        this.sendNotificationUseCase = sendNotificationUseCase;
     }
 
     @Override
@@ -59,7 +62,11 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
         }
 
         Task task = new Task(UUID.randomUUID(), boardId, title, description, statusColumnId, assigneeId, priority, dueDate, createdBy, Instant.now(), Instant.now(), null, 0, null, false, null, null);
-        return taskRepositoryPort.save(task);
+        task = taskRepositoryPort.save(task);
+        if (task.getAssigneeId() != null) {
+            sendNotificationUseCase.sendTaskAssignedNotification(task);
+        }
+        return task;
     }
 
     @Override
@@ -83,10 +90,13 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
             task.setDescription(description);
         }
 
+        boolean assigneeChanged = false;
+
         if (assigneeId != null && !Objects.equals(task.getAssigneeId(), assigneeId)) {
             verifyUserInBoard(task.getBoardId(), assigneeId);
             recordHistory(taskId, "assignee_id", String.valueOf(task.getAssigneeId()), String.valueOf(assigneeId), updaterId);
             task.setAssigneeId(assigneeId);
+            assigneeChanged = true;
         }
 
         if (statusColumnId != null && !Objects.equals(task.getStatusColumnId(), statusColumnId)) {
@@ -103,7 +113,13 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
         }
         
         task.setUpdatedAt(Instant.now());
-        return taskRepositoryPort.save(task);
+        task = taskRepositoryPort.save(task);
+
+        if (assigneeChanged) {
+            sendNotificationUseCase.sendTaskAssignedNotification(task);
+        }
+
+        return task;
     }
 
     @Override

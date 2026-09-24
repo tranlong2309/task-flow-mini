@@ -21,4 +21,11 @@ public class BoardMemberRepositoryAdapter implements BoardMemberRepositoryPort {
         return springDataBoardMemberRepository.findByBoardIdAndUserId(boardId, userId)
                 .map(BoardMemberEntity::getRoleName);
     }
+
+    @Override
+    public java.util.List<Long> findManagers(UUID boardId) {
+        return springDataBoardMemberRepository.findByBoardIdAndRoleNameIn(boardId, java.util.List.of("MANAGER", "ADMIN")).stream()
+                .map(BoardMemberEntity::getUserId)
+                .collect(java.util.stream.Collectors.toList());
+    }
 }
