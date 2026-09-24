@@ -5,3 +5,12 @@
 .project
 .settings/
 docs/promp.md
+
+# IDEs
+.idea/
+*.iml
+.vscode/
+
+# Local Maven
+apache-maven-*/
+maven.zip
