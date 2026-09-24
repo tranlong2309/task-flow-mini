@@ -112,4 +112,55 @@ class LoggingIntegrationTest {
             logger.detachAppender(listAppender);
         }
     }
+
+    @Test
+    void rowErrorEscapingFix() throws Exception {
+        Path input = temporaryDirectory.resolve("bad-escaping.xlsx");
+        try (Workbook workbook = new XSSFWorkbook(); var output = Files.newOutputStream(input)) {
+            var sheet = workbook.createSheet("Items");
+            var header = sheet.createRow(0);
+            header.createCell(0).setCellValue("item_name");
+            header.createCell(1).setCellValue("quantity");
+            header.createCell(2).setCellValue("unit_price");
+            header.createCell(3).setCellValue("vat_rate");
+            var row = sheet.createRow(1);
+            row.createCell(0).setCellValue("Item");
+            row.createCell(1).setCellValue("bad\\\"value");
+            row.createCell(2).setCellValue(100);
+            row.createCell(3).setCellValue(10);
+            workbook.write(output);
+        }
+
+        Path logDirectory = temporaryDirectory.resolve("logs-esc");
+        ProcessingResult result = InvoiceProcessor.create(InvoiceConfig.builder().jobLogDirectory(logDirectory).build())
+                .process(input, temporaryDirectory.resolve("output-esc.xlsx"), JobContext.of("esc-123"));
+        
+        Path jobLog = result.jobLogFile().orElseThrow();
+        String content = Files.readString(jobLog);
+        
+        // bad\"value should be serialized as "bad\\\"value"
+        assertThat(content).contains("value=\"bad\\\\\\\"value\"");
+    }
+
+    @Test
+    void fatalFailureEscapingFix() throws Exception {
+        Path input = temporaryDirectory.resolve("bad-escaping-fatal.xlsx");
+        try (Workbook workbook = new XSSFWorkbook(); var output = Files.newOutputStream(input)) {
+            workbook.createSheet("Items");
+            workbook.write(output);
+        }
+
+        Path logDirectory = temporaryDirectory.resolve("logs-esc-fatal");
+        
+        assertThatThrownBy(() -> InvoiceProcessor.create(InvoiceConfig.builder().jobLogDirectory(logDirectory).sheetName("bad\\\"sheet").build())
+                .process(input, temporaryDirectory.resolve("output-esc-fatal.xlsx"), JobContext.of("esc-fatal")))
+                .isInstanceOf(ExcelFormatException.class);
+
+        Path jobLog = Files.list(logDirectory).findFirst().orElseThrow();
+        String content = Files.readString(jobLog);
+        
+        // The exception message contains: sheet 'bad\"sheet' was not found
+        // Sanitized and quoted: "sheet 'bad\\\"sheet' was not found; available sheets: [Items]"
+        assertThat(content).contains("message=\"sheet 'bad\\\\\\\"sheet' was not found; available sheets: [Items]\"");
+    }
 }

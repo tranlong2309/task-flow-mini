@@ -75,7 +75,7 @@ public final class JobExecution implements AutoCloseable {
     public void rowError(RowError error) {
         event("DEBUG", "WARN", "row.error", "row=" + error.rowNumber(), "cell=" + quote(error.cellAddress()),
                 "column=" + quote(error.columnName()), "code=" + error.errorCode(),
-                "value=" + quote(sanitize(error.offendingValue())), "message=" + quote(sanitize(error.message())));
+                "value=" + quote(error.offendingValue()), "message=" + quote(error.message()));
     }
 
     public void complete(ProcessingResult result, String outputName) {
@@ -97,7 +97,7 @@ public final class JobExecution implements AutoCloseable {
 
     public void failed(Throwable throwable) {
         sameEvent("WARN", "job.failed", "exceptionType=" + throwable.getClass().getSimpleName(),
-                "message=" + quote(sanitize(throwable.getMessage())));
+                "message=" + quote(throwable.getMessage()));
         LOG.debug("job.failed jobId={} exceptionType={}", jobId, throwable.getClass().getSimpleName(), throwable);
     }
 
