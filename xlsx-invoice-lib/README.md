@@ -63,6 +63,13 @@ Invoice invoice = processor.calculate(List.of(
     new InvoiceItem("Laptop", new BigDecimal("2"), new BigDecimal("15000000"), new BigDecimal("10"))));
 ```
 
+For batch processing multiple files:
+
+```java
+List<BatchJob> jobs = List.of(BatchJob.of(Path.of("in1.xlsx"), Path.of("out1.xlsx")));
+BatchResult result = processor.processBatch(jobs);
+```
+
 ## Configuration
 
 | Option | Default |
