@@ -1,15 +1,16 @@
 package com.company.invoice.xlsx.internal;
 
-import com.company.invoice.xlsx.ErrorCode;
+import com.company.invoice.xlsx.error.ErrorCode;
 import com.company.invoice.xlsx.InvoiceConfig;
-import com.company.invoice.xlsx.InvoiceItem;
-import com.company.invoice.xlsx.InvoiceLine;
-import com.company.invoice.xlsx.InvoiceTotals;
-import com.company.invoice.xlsx.RowError;
+import com.company.invoice.xlsx.model.InvoiceItem;
+import com.company.invoice.xlsx.model.InvoiceLine;
+import com.company.invoice.xlsx.model.InvoiceTotals;
+import com.company.invoice.xlsx.model.RowError;
 import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.util.ArrayList;
 import java.util.List;
+import com.company.invoice.xlsx.error.InvoiceException;
 
 /** Performs all monetary arithmetic without floating-point arithmetic. */
 public final class Calculator {

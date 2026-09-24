@@ -17,6 +17,8 @@ import ch.qos.logback.classic.spi.ILoggingEvent;
 import ch.qos.logback.core.read.ListAppender;
 import com.company.invoice.xlsx.internal.JobExecution;
 import java.util.List;
+import com.company.invoice.xlsx.error.ExcelFormatException;
+import com.company.invoice.xlsx.error.InvoiceException;
 
 class LoggingIntegrationTest {
     @TempDir

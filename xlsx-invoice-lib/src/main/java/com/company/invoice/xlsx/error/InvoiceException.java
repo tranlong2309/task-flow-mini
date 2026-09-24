@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.error;
 
 /** Base unchecked exception for fatal invoice processing failures. */
 public class InvoiceException extends RuntimeException {

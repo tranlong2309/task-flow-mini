@@ -1,6 +1,7 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.batch;
 
 import java.util.Optional;
+import com.company.invoice.xlsx.error.InvoiceException;
 
 /** 
  * Outcome of a single job within a batch. 

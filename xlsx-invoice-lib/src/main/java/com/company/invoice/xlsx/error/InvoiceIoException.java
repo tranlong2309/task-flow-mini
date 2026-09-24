@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.error;
 
 /** Indicates a file, stream, temporary-file, atomic-move, or interruption failure. */
 public final class InvoiceIoException extends InvoiceException {

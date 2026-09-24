@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.error;
 
 /** Stable codes for row-level validation problems. */
 public enum ErrorCode {

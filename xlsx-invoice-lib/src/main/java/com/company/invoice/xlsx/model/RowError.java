@@ -1,4 +1,6 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.model;
+
+import com.company.invoice.xlsx.error.ErrorCode;
 
 /** Immutable diagnostic for one validation problem in an input row. */
 public record RowError(

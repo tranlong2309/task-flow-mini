@@ -1,4 +1,4 @@
-package com.company.invoice.xlsx;
+package com.company.invoice.xlsx.error;
 
 /** Indicates an unsupported, corrupt, encrypted, or structurally invalid workbook. */
 public final class ExcelFormatException extends InvoiceException {
