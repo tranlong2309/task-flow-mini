@@ -48,8 +48,8 @@ class TaskStatusApplicationServiceTest {
     void moveTask_shouldReorderWithinSameColumn() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
-        Task otherTask = new Task(UUID.randomUUID(), boardId, "Title2", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 1, null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
+        Task otherTask = new Task(UUID.randomUUID(), boardId, "Title2", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 1, null, false, null, null);
 
         BoardColumn col = new BoardColumn(1L, boardId, "Todo", 0);
 
@@ -74,7 +74,7 @@ class TaskStatusApplicationServiceTest {
     void moveTask_shouldMoveToDifferentColumnAndSetCompletedAt() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
 
         BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
         BoardColumn tgtCol = new BoardColumn(2L, boardId, "Done", 1);
@@ -101,7 +101,7 @@ class TaskStatusApplicationServiceTest {
     void updateTaskStatus_shouldThrowException_whenTargetColumnNotBelongToBoard() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
 
         BoardColumn tgtCol = new BoardColumn(2L, UUID.randomUUID(), "Done", 1); // Different boardId
 
@@ -111,5 +111,51 @@ class TaskStatusApplicationServiceTest {
         assertThrows(IllegalArgumentException.class, () -> {
             taskStatusApplicationService.updateTaskStatus(taskId, 2L, "note", 2L);
         });
+    }
+
+    @Test
+    void blockTask_shouldThrowException_whenReasonIsBlank() {
+        UUID taskId = UUID.randomUUID();
+        assertThrows(IllegalArgumentException.class, () -> {
+            taskStatusApplicationService.blockTask(taskId, " ", 2L);
+        });
+    }
+
+    @Test
+    void blockTask_shouldSetIsBlockedAndReason() {
+        UUID taskId = UUID.randomUUID();
+        UUID boardId = UUID.randomUUID();
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
+
+        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
+
+        when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
+        when(boardColumnRepositoryPort.findById(1L)).thenReturn(Optional.of(srcCol));
+        when(taskRepositoryPort.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
+
+        Task blockedTask = taskStatusApplicationService.blockTask(taskId, "Waiting for client", 2L);
+
+        assertTrue(blockedTask.getIsBlocked());
+        assertEquals("Waiting for client", blockedTask.getBlockedReason());
+        assertNotNull(blockedTask.getBlockedAt());
+    }
+
+    @Test
+    void unblockTask_shouldClearIsBlockedAndReason() {
+        UUID taskId = UUID.randomUUID();
+        UUID boardId = UUID.randomUUID();
+        Task blockedTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, true, "Reason", Instant.now());
+
+        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
+
+        when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(blockedTask));
+        when(boardColumnRepositoryPort.findById(1L)).thenReturn(Optional.of(srcCol));
+        when(taskRepositoryPort.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
+
+        Task unblockedTask = taskStatusApplicationService.unblockTask(taskId, 2L);
+
+        assertFalse(unblockedTask.getIsBlocked());
+        assertNull(unblockedTask.getBlockedReason());
+        assertNull(unblockedTask.getBlockedAt());
     }
 }

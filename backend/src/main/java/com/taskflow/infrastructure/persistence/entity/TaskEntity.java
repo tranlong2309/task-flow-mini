@@ -51,6 +51,15 @@ public class TaskEntity {
     @Column(name = "completed_at")
     private Instant completedAt;
 
+    @Column(name = "is_blocked", nullable = false)
+    private Boolean isBlocked = false;
+
+    @Column(name = "blocked_reason", columnDefinition = "TEXT")
+    private String blockedReason;
+
+    @Column(name = "blocked_at")
+    private Instant blockedAt;
+
     public TaskEntity() {}
 
     // Getters and Setters
@@ -82,4 +91,10 @@ public class TaskEntity {
     public void setPosition(Integer position) { this.position = position; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+    public Boolean getIsBlocked() { return isBlocked; }
+    public void setIsBlocked(Boolean isBlocked) { this.isBlocked = isBlocked; }
+    public String getBlockedReason() { return blockedReason; }
+    public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
+    public Instant getBlockedAt() { return blockedAt; }
+    public void setBlockedAt(Instant blockedAt) { this.blockedAt = blockedAt; }
 }

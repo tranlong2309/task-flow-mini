@@ -19,8 +19,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+import com.taskflow.application.port.in.BlockTaskUseCase;
+import com.taskflow.application.port.in.UnblockTaskUseCase;
+
 @Service
-public class TaskStatusApplicationService implements UpdateTaskStatusUseCase, MoveTaskUseCase {
+public class TaskStatusApplicationService implements UpdateTaskStatusUseCase, MoveTaskUseCase, BlockTaskUseCase, UnblockTaskUseCase {
 
     private final TaskRepositoryPort taskRepositoryPort;
     private final TaskHistoryRepositoryPort taskHistoryRepositoryPort;
@@ -123,6 +126,59 @@ public class TaskStatusApplicationService implements UpdateTaskStatusUseCase, Mo
         return taskRepositoryPort.save(task);
     }
 
+    @Override
+    @Transactional
+    public Task blockTask(UUID taskId, String reason, Long updaterId) {
+        if (reason == null || reason.trim().isEmpty()) {
+            throw new IllegalArgumentException("blockedReason is required when blocking a task");
+        }
+        
+        Task task = getTaskAndVerifyPermission(taskId, updaterId);
+        
+        if (Boolean.TRUE.equals(task.getIsBlocked())) {
+            return task; // Already blocked
+        }
+
+        task.setIsBlocked(true);
+        task.setBlockedReason(reason);
+        task.setBlockedAt(Instant.now());
+        
+        BoardColumn currentColumn = getColumnAndVerifyBoard(task.getStatusColumnId(), task.getBoardId());
+        handleDoneStatus(task, currentColumn);
+
+        task.setUpdatedAt(Instant.now());
+        task = taskRepositoryPort.save(task);
+
+        recordHistory(taskId, "is_blocked", "false", "true", updaterId);
+        recordHistory(taskId, "blocked_reason", null, reason, updaterId);
+
+        return task;
+    }
+
+    @Override
+    @Transactional
+    public Task unblockTask(UUID taskId, Long updaterId) {
+        Task task = getTaskAndVerifyPermission(taskId, updaterId);
+        
+        if (!Boolean.TRUE.equals(task.getIsBlocked())) {
+            return task; // Not blocked
+        }
+
+        task.setIsBlocked(false);
+        task.setBlockedReason(null);
+        task.setBlockedAt(null);
+
+        BoardColumn currentColumn = getColumnAndVerifyBoard(task.getStatusColumnId(), task.getBoardId());
+        handleDoneStatus(task, currentColumn);
+
+        task.setUpdatedAt(Instant.now());
+        task = taskRepositoryPort.save(task);
+
+        recordHistory(taskId, "is_blocked", "true", "false", updaterId);
+
+        return task;
+    }
+
     private Task getTaskAndVerifyPermission(UUID taskId, Long userId) {
         Task task = taskRepositoryPort.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
@@ -151,7 +207,9 @@ public class TaskStatusApplicationService implements UpdateTaskStatusUseCase, Mo
 
     private void handleDoneStatus(Task task, BoardColumn targetColumn) {
         if ("Done".equalsIgnoreCase(targetColumn.getName())) {
-            if (task.getCompletedAt() == null) {
+            if (Boolean.TRUE.equals(task.getIsBlocked())) {
+                task.setCompletedAt(null);
+            } else if (task.getCompletedAt() == null) {
                 task.setCompletedAt(Instant.now());
             }
         } else {

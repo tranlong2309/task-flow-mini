@@ -225,6 +225,26 @@ public class TaskIntegrationTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.position").value(1));
 
+        // 4.3. Block task
+        mockMvc.perform(patch("/api/v1/tasks/" + taskId + "/block")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "reason", "Waiting for design approval"
+                ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isBlocked").value(true))
+                .andExpect(jsonPath("$.blockedReason").value("Waiting for design approval"))
+                .andExpect(jsonPath("$.completedAt").isEmpty()); // Should clear completedAt if it was Done
+
+        // 4.4. Unblock task
+        mockMvc.perform(patch("/api/v1/tasks/" + taskId + "/unblock")
+                .header("Authorization", "Bearer " + userToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isBlocked").value(false))
+                .andExpect(jsonPath("$.blockedReason").isEmpty())
+                .andExpect(jsonPath("$.completedAt").isNotEmpty()); // Should restore completedAt because it's in Done
+
         // 5. Delete Task (Soft delete)
         mockMvc.perform(delete("/api/v1/tasks/" + taskId)
                 .header("Authorization", "Bearer " + userToken))

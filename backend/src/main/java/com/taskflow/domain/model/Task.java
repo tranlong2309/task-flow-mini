@@ -18,10 +18,13 @@ public class Task {
     private Instant deletedAt;
     private Integer position;
     private Instant completedAt;
+    private Boolean isBlocked;
+    private String blockedReason;
+    private Instant blockedAt;
 
     public Task() {}
 
-    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt) {
+    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt, Boolean isBlocked, String blockedReason, Instant blockedAt) {
         this.id = id;
         this.boardId = boardId;
         this.title = title;
@@ -36,6 +39,9 @@ public class Task {
         this.deletedAt = deletedAt;
         this.position = position;
         this.completedAt = completedAt;
+        this.isBlocked = isBlocked != null ? isBlocked : false;
+        this.blockedReason = blockedReason;
+        this.blockedAt = blockedAt;
     }
 
     public UUID getId() { return id; }
@@ -66,4 +72,10 @@ public class Task {
     public void setPosition(Integer position) { this.position = position; }
     public Instant getCompletedAt() { return completedAt; }
     public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
+    public Boolean getIsBlocked() { return isBlocked; }
+    public void setIsBlocked(Boolean isBlocked) { this.isBlocked = isBlocked; }
+    public String getBlockedReason() { return blockedReason; }
+    public void setBlockedReason(String blockedReason) { this.blockedReason = blockedReason; }
+    public Instant getBlockedAt() { return blockedAt; }
+    public void setBlockedAt(Instant blockedAt) { this.blockedAt = blockedAt; }
 }

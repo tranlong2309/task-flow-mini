@@ -99,6 +99,9 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
         entity.setDeletedAt(task.getDeletedAt());
         entity.setPosition(task.getPosition() != null ? task.getPosition() : 0);
         entity.setCompletedAt(task.getCompletedAt());
+        entity.setIsBlocked(task.getIsBlocked() != null ? task.getIsBlocked() : false);
+        entity.setBlockedReason(task.getBlockedReason());
+        entity.setBlockedAt(task.getBlockedAt());
         return entity;
     }
 
@@ -117,7 +120,10 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
                 entity.getUpdatedAt(),
                 entity.getDeletedAt(),
                 entity.getPosition(),
-                entity.getCompletedAt()
+                entity.getCompletedAt(),
+                entity.getIsBlocked(),
+                entity.getBlockedReason(),
+                entity.getBlockedAt()
         );
     }
 }

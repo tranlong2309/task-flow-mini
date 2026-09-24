@@ -29,6 +29,8 @@ public class TaskController {
     private final DeleteTaskUseCase deleteTaskUseCase;
     private final UpdateTaskStatusUseCase updateTaskStatusUseCase;
     private final MoveTaskUseCase moveTaskUseCase;
+    private final BlockTaskUseCase blockTaskUseCase;
+    private final UnblockTaskUseCase unblockTaskUseCase;
 
     public TaskController(CreateTaskUseCase createTaskUseCase,
                           UpdateTaskUseCase updateTaskUseCase,
@@ -36,7 +38,9 @@ public class TaskController {
                           SearchTasksUseCase searchTasksUseCase,
                           DeleteTaskUseCase deleteTaskUseCase,
                           UpdateTaskStatusUseCase updateTaskStatusUseCase,
-                          MoveTaskUseCase moveTaskUseCase) {
+                          MoveTaskUseCase moveTaskUseCase,
+                          BlockTaskUseCase blockTaskUseCase,
+                          UnblockTaskUseCase unblockTaskUseCase) {
         this.createTaskUseCase = createTaskUseCase;
         this.updateTaskUseCase = updateTaskUseCase;
         this.getTaskUseCase = getTaskUseCase;
@@ -44,6 +48,8 @@ public class TaskController {
         this.deleteTaskUseCase = deleteTaskUseCase;
         this.updateTaskStatusUseCase = updateTaskStatusUseCase;
         this.moveTaskUseCase = moveTaskUseCase;
+        this.blockTaskUseCase = blockTaskUseCase;
+        this.unblockTaskUseCase = unblockTaskUseCase;
     }
 
     @PostMapping("/tasks")
@@ -144,6 +150,30 @@ public class TaskController {
             int targetIndex = Integer.parseInt(payload.get("targetIndex").toString());
             
             Task task = moveTaskUseCase.moveTask(taskId, sourceColumnId, targetColumnId, sourceIndex, targetIndex, userDetails.getId());
+            return ResponseEntity.ok(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/tasks/{taskId}/block")
+    public ResponseEntity<?> blockTask(@PathVariable UUID taskId,
+                                       @RequestBody Map<String, Object> payload,
+                                       @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            String reason = payload.containsKey("reason") ? (String) payload.get("reason") : null;
+            Task task = blockTaskUseCase.blockTask(taskId, reason, userDetails.getId());
+            return ResponseEntity.ok(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/tasks/{taskId}/unblock")
+    public ResponseEntity<?> unblockTask(@PathVariable UUID taskId,
+                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            Task task = unblockTaskUseCase.unblockTask(taskId, userDetails.getId());
             return ResponseEntity.ok(task);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
