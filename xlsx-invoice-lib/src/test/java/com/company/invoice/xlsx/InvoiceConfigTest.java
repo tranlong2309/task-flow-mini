@@ -14,7 +14,7 @@ class InvoiceConfigTest {
         InvoiceConfig config = InvoiceConfig.builder()
                 .roundingMode(RoundingMode.DOWN)
                 .headerAliases(Map.of("qty", "quantity"))
-                .tempDirectory(Path.of("C:/tmp"))
+                .tempDirectory(Path.of(System.getProperty("java.io.tmpdir")))
                 .build();
 
         assertThat(config.scale()).isEqualTo(2);
