@@ -622,3 +622,73 @@ Every public method must have at least one positive test and one negative/edge t
 
 - **[GOOD]:** `createWorkOrder_shouldReturn201_whenValidRequest()` and `createWorkOrder_shouldReturn400_whenEquipmentIdBlank()`
 - **[BAD]:** No test class exists for `WorkOrderService`.
+# Java Code Formatting Rules (Line Breaks / Blank Lines)
+
+Applies to all Java code written or modified in `xlsx-invoice-lib`.
+
+## General Principles
+- Group statements by meaning and separate groups with exactly one blank line.
+- Keep the project's existing style (4-space indent, brace placement, single-line `if` without braces where already used). Do not switch styles on your own.
+- If the project has a formatter (Spotless, Checkstyle, `.editorconfig`), follow its configuration.
+- When doing a formatting-only refactor: do not change logic, names, statement order, imports, comments, annotations, or Javadoc.
+
+## When to Insert a Blank Line
+1. **Variable declarations → main processing step**: after the block of variable declarations, add one blank line before the first `for`/`while`/`if`/`try`.
+2. **Within a declaration block**: keep variables with the same purpose together and separate groups with one blank line (e.g. the collections `lines` and `errors` form one group; the totals `beforeTotal`, `vatTotal`, `afterTotal` and the counter form another).
+3. **Inside a loop body**, separate by phase:
+   - reading the input data
+   - computing and skip checks (`if (...) continue;`)
+   - building the result (creating objects, incrementing counters, adding to lists)
+   - accumulating (the `xxxTotal = xxxTotal.add(...)` lines)
+4. **After a large `for`/`while`/`try`/`if` block ends**: one blank line before the next statement.
+5. **Before a standalone `return` or `throw`**: one blank line, unless it is the only statement in the block or directly follows a short guard clause.
+6. **At the start of a method**: guard clauses / validation (null checks, early `throw`) form one group, followed by one blank line before the main logic.
+7. **Between methods, classes, and inner classes**: exactly one blank line.
+
+## Do Not
+- Do not add a blank line at the start or end of a `{ }` block.
+- Do not use two consecutive blank lines.
+- Do not separate tightly related statements (e.g. the three total-accumulation lines must stay together; a variable declaration and the line that immediately uses it must not be split).
+- Do not over-split: each group should have 2 or more lines where possible, and a method shorter than 6 lines should be left as is.
+
+## Wrapping Long Lines
+- For expressions longer than 120 characters, break at the `.` of a method chain or after the `,` between arguments, indented 8 spaces from the first line. Do not change the content of the expression.
+
+## Reference Example
+```java
+List<InvoiceLine> lines = new ArrayList<>();
+List<RowError> errors = new ArrayList<>();
+
+BigDecimal beforeTotal = BigDecimal.ZERO.setScale(config.scale(), ...);
+BigDecimal vatTotal = beforeTotal;
+BigDecimal afterTotal = beforeTotal;
+int lineNumber = 0;
+
+for (int index = 0; index < items.size(); index++) {
+    InvoiceItem item = items.get(index);
+    int rowNumber = index + 1;
+
+    Optional<InvoiceLine> calculation = calculateSingleLine(...);
+    if (calculation.isEmpty()) continue;
+
+    InvoiceLine line = calculation.get();
+    lineNumber++;
+    lines.add(new InvoiceLine(lineNumber, ...));
+
+    beforeTotal = beforeTotal.add(line.amountBeforeVat());
+    vatTotal = vatTotal.add(line.vatAmount());
+    afterTotal = afterTotal.add(line.amountAfterVat());
+}
+
+if (exceedsPrecision(beforeTotal) || exceedsPrecision(vatTotal)) {
+    throw new InvoiceException(...);
+}
+```
+
+## When Refactoring Formatting Only
+- Process one file at a time, starting with the longest methods.
+- Verify when done:
+  - `git diff -w --stat` must be empty (no changes other than whitespace).
+  - `mvn -B -ntp clean verify` in `xlsx-invoice-lib` must pass.
+- Use a separate commit for the formatting pass (e.g. `style: format blank lines`) and never mix it with logic changes.
+- If unsure whether to split somewhere, leave it unchanged and list it in the report instead of guessing.

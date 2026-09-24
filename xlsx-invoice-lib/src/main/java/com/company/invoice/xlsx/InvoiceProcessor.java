@@ -68,15 +68,19 @@ public final class InvoiceProcessor {
         if (input.toAbsolutePath().normalize().equals(output.toAbsolutePath().normalize())) {
             throw new IllegalArgumentException("input and output paths must differ");
         }
+
         try (JobExecution execution = new JobExecution(config, context)) {
             execution.start(input.getFileName().toString(), Files.exists(input) ? Files.size(input) : -1,
                     output.getFileName().toString());
+
             try {
                 ProcessingResult result = new WorkbookProcessor(config).process(input, output, execution);
                 execution.complete(result, output.getFileName().toString());
+
                 return result;
             } catch (InvoiceException exception) {
                 execution.failed(exception);
+
                 throw exception.withJobId(execution.jobId());
             }
         } catch (IOException exception) {
@@ -105,14 +109,18 @@ public final class InvoiceProcessor {
     public ProcessingResult process(InputStream input, OutputStream output, JobContext context) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(output, "output");
+
         try (JobExecution execution = new JobExecution(config, context)) {
             execution.start("stream", -1, "stream");
+
             try {
                 ProcessingResult result = new WorkbookProcessor(config).process(input, output, execution);
                 execution.complete(result, "stream");
+
                 return result;
             } catch (InvoiceException exception) {
                 execution.failed(exception);
+
                 throw exception.withJobId(execution.jobId());
             }
         }
@@ -149,6 +157,7 @@ public final class InvoiceProcessor {
         
         ExecutorService executor = options.executor();
         boolean internalExecutor = false;
+
         if (executor == null) {
             executor = Executors.newFixedThreadPool(options.maxConcurrency());
             internalExecutor = true;
@@ -161,22 +170,29 @@ public final class InvoiceProcessor {
             for (BatchJob job : jobs) {
                 futures.add(executor.submit(() -> {
                     if (options.stopOnFirstFailure() && abort.get()) {
-                        return new BatchItemResult(job, Optional.empty(), Optional.of(new BatchJobSkippedException("skipped after an earlier batch failure (stopOnFirstFailure=true)")));
+                        return new BatchItemResult(job, Optional.empty(), Optional.of(new BatchJobSkippedException(
+                                "skipped after an earlier batch failure (stopOnFirstFailure=true)")));
                     }
+
                     try {
                         ProcessingResult result = process(job.input(), job.output(), job.context());
+
                         return new BatchItemResult(job, Optional.of(result), Optional.empty());
                     } catch (InvoiceException exception) {
                         if (options.stopOnFirstFailure()) abort.set(true);
+
                         return new BatchItemResult(job, Optional.empty(), Optional.of(exception));
                     } catch (Throwable throwable) {
                         if (options.stopOnFirstFailure()) abort.set(true);
-                        return new BatchItemResult(job, Optional.empty(), Optional.of(new InvoiceIoException("batch item failed", throwable)));
+
+                        return new BatchItemResult(job, Optional.empty(), Optional.of(new InvoiceIoException(
+                                "batch item failed", throwable)));
                     }
                 }));
             }
             
             List<BatchItemResult> results = new ArrayList<>();
+
             for (Future<BatchItemResult> future : futures) {
                 try {
                     results.add(future.get());
@@ -185,12 +201,14 @@ public final class InvoiceProcessor {
                         f.cancel(true);
                     }
                     Thread.currentThread().interrupt();
+
                     throw new InvoiceIoException("batch processing was interrupted", exception);
                 } catch (Exception exception) {
                     // Should not happen as Callable catches Throwable
                     throw new InvoiceIoException("unexpected error collecting batch results", exception);
                 }
             }
+
             return new BatchResult(results);
         } finally {
             if (internalExecutor) {

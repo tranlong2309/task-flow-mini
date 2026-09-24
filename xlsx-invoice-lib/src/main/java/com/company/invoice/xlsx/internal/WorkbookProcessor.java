@@ -55,15 +55,19 @@ public final class WorkbookProcessor {
 
     public ProcessingResult process(Path input, Path output, JobExecution execution) {
         Path temporaryOutput = null;
+
         try {
             validateInputFile(input);
+
             Path outputDirectory = output.toAbsolutePath().normalize().getParent();
             if (outputDirectory == null) outputDirectory = Path.of(".").toAbsolutePath();
             Files.createDirectories(outputDirectory);
+
             temporaryOutput = outputDirectory.resolve(".xlsx-invoice-" + UUID.randomUUID() + ".tmp");
             ProcessingResult state = parse(input, temporaryOutput, execution);
             moveAtomically(temporaryOutput, output);
             temporaryOutput = null;
+
             return state;
         } catch (InvoiceException exception) {
             throw exception;
@@ -84,19 +88,25 @@ public final class WorkbookProcessor {
     public ProcessingResult process(InputStream input, OutputStream output, JobExecution execution) {
         Objects.requireNonNull(input, "input");
         Objects.requireNonNull(output, "output");
+
         Path spool = null;
         Path temporaryOutput = null;
+
         try {
             Path directory = config.tempDirectory() == null ? Path.of(System.getProperty("java.io.tmpdir")) : config.tempDirectory();
             Files.createDirectories(directory);
+
             spool = directory.resolve("xlsx-invoice-input-" + UUID.randomUUID() + ".xlsx");
             copyBounded(input, spool, config.maxInputBytes());
+
             Path destination = directory.resolve("xlsx-invoice-output-" + UUID.randomUUID() + ".xlsx");
             temporaryOutput = destination;
             ProcessingResult state = parse(spool, temporaryOutput, execution);
+
             try (InputStream generated = Files.newInputStream(temporaryOutput)) {
                 generated.transferTo(output);
             }
+
             return state;
         } catch (InvoiceException exception) {
             throw exception;
@@ -116,7 +126,10 @@ public final class WorkbookProcessor {
         List<RowError> mappedErrors = rawResult.errors().stream()
                 .map(e -> new RowError("memory", e.row(), e.cell(), e.column(), e.value(), e.code(), e.message()))
                 .toList();
-        Calculator.CalculationResult result = new Calculator.CalculationResult(rawResult.lines(), rawResult.totals(), mappedErrors);
+
+        Calculator.CalculationResult result = new Calculator.CalculationResult(rawResult.lines(), rawResult.totals(),
+                mappedErrors);
+
         return new Invoice(result.lines(), result.totals(), result.errors());
     }
 
@@ -158,8 +171,11 @@ public final class WorkbookProcessor {
             
             if (sheetStream == null) {
                 if (names.isEmpty()) throw new ExcelFormatException("workbook contains no sheets");
-                if (config.sheetName() != null) throw new ExcelFormatException("sheet '" + config.sheetName() + "' was not found; available sheets: " + names);
-                if (config.sheetIndex() != null) throw new ExcelFormatException("sheet index " + config.sheetIndex() + " was not found; available sheets: " + names);
+                if (config.sheetName() != null) throw new ExcelFormatException(
+                        "sheet '" + config.sheetName() + "' was not found; available sheets: " + names);
+                if (config.sheetIndex() != null) throw new ExcelFormatException(
+                        "sheet index " + config.sheetIndex() + " was not found; available sheets: " + names);
+
                 throw new ExcelFormatException("selected sheet was not found");
             }
             
@@ -181,8 +197,10 @@ public final class WorkbookProcessor {
     private void validateInputFile(Path input) throws IOException {
         if (!Files.isRegularFile(input)) throw new ExcelFormatException("input workbook does not exist");
         if (Files.size(input) > config.maxInputBytes()) throw new ExcelFormatException("input workbook exceeds maxInputBytes");
+
         try (InputStream stream = Files.newInputStream(input)) {
             byte[] signature = stream.readNBytes(4);
+
             if (signature.length != 4 || signature[0] != 'P' || signature[1] != 'K') {
                 throw new ExcelFormatException("input is not an OOXML workbook");
             }
@@ -310,15 +328,26 @@ public final class WorkbookProcessor {
             String unitPriceText = value(InvoiceColumn.UNIT_PRICE);
             String vatRateText = value(InvoiceColumn.VAT_RATE);
             List<RowError> rowErrors = new ArrayList<>();
+
             BigDecimal quantity = parseNumber(quantityText, InvoiceColumn.QUANTITY, rowErrors);
             BigDecimal unitPrice = parseNumber(unitPriceText, InvoiceColumn.UNIT_PRICE, rowErrors);
             BigDecimal vatRate = parseNumber(vatRateText, InvoiceColumn.VAT_RATE, rowErrors);
-            if (itemName.isBlank()) rowErrors.add(error(InvoiceColumn.ITEM_NAME, itemName, ErrorCode.MISSING_VALUE, "value is required"));
-            if (itemName.length() > 255) rowErrors.add(error(InvoiceColumn.ITEM_NAME, itemName, ErrorCode.TEXT_TOO_LONG, "item_name exceeds 255 characters"));
-            if (quantity != null && quantity.signum() <= 0) rowErrors.add(error(InvoiceColumn.QUANTITY, quantityText, ErrorCode.OUT_OF_RANGE, "value is out of range (must be greater than 0)"));
-            if (quantity != null && quantity.signum() > 0 && quantity.scale() > 3) rowErrors.add(error(InvoiceColumn.QUANTITY, quantityText, ErrorCode.TOO_MANY_DECIMALS, "quantity has more than 3 decimal places"));
-            if (unitPrice != null && unitPrice.signum() < 0) rowErrors.add(error(InvoiceColumn.UNIT_PRICE, unitPriceText, ErrorCode.OUT_OF_RANGE, "value must not be negative"));
-            if (vatRate != null && (vatRate.signum() < 0 || vatRate.compareTo(BigDecimal.valueOf(100)) > 0)) rowErrors.add(error(InvoiceColumn.VAT_RATE, vatRateText, ErrorCode.OUT_OF_RANGE, "value must be between 0 and 100"));
+
+            if (itemName.isBlank()) rowErrors.add(error(InvoiceColumn.ITEM_NAME, itemName, ErrorCode.MISSING_VALUE,
+                    "value is required"));
+            if (itemName.length() > 255) rowErrors.add(error(InvoiceColumn.ITEM_NAME, itemName, ErrorCode.TEXT_TOO_LONG,
+                    "item_name exceeds 255 characters"));
+            if (quantity != null && quantity.signum() <= 0) rowErrors.add(error(InvoiceColumn.QUANTITY, quantityText,
+                    ErrorCode.OUT_OF_RANGE, "value is out of range (must be greater than 0)"));
+            if (quantity != null && quantity.signum() > 0 && quantity.scale() > 3) rowErrors.add(error(
+                    InvoiceColumn.QUANTITY, quantityText, ErrorCode.TOO_MANY_DECIMALS,
+                    "quantity has more than 3 decimal places"));
+            if (unitPrice != null && unitPrice.signum() < 0) rowErrors.add(error(InvoiceColumn.UNIT_PRICE,
+                    unitPriceText, ErrorCode.OUT_OF_RANGE, "value must not be negative"));
+            if (vatRate != null && (vatRate.signum() < 0 || vatRate.compareTo(BigDecimal.valueOf(100)) > 0)) rowErrors.add(
+                    error(InvoiceColumn.VAT_RATE, vatRateText, ErrorCode.OUT_OF_RANGE,
+                            "value must be between 0 and 100"));
+
             if (!rowErrors.isEmpty()) {
                 addErrors(rowErrors);
                 skippedRowCount++;
@@ -326,19 +355,25 @@ public final class WorkbookProcessor {
                 return;
             }
             List<RowError> rawCalcErrors = new ArrayList<>();
-            Optional<InvoiceLine> calculation = Calculator.calculateSingleLine(handlerConfig, new InvoiceItem(itemName, quantity, unitPrice, vatRate), currentRow, rawCalcErrors);
+            Optional<InvoiceLine> calculation = Calculator.calculateSingleLine(handlerConfig,
+                    new InvoiceItem(itemName, quantity, unitPrice, vatRate), currentRow, rawCalcErrors);
+
             if (calculation.isEmpty()) {
                 addErrors(rawCalcErrors.stream()
-                    .map(e -> new RowError(sheetName, e.row(), e.cell(), e.column(), e.value(), e.code(), e.message()))
-                    .toList());
+                        .map(e -> new RowError(sheetName, e.row(), e.cell(), e.column(), e.value(), e.code(),
+                                e.message()))
+                        .toList());
                 skippedRowCount++;
                 execution.progress(dataRowCount, processedRowCount, skippedRowCount);
                 return;
             }
+
             InvoiceLine line = calculation.get();
-            line = new InvoiceLine(++outputLineNumber, line.itemName(), line.quantity(), line.unitPrice(), line.vatRate(), line.amountBeforeVat(), line.vatAmount(), line.amountAfterVat());
+            line = new InvoiceLine(++outputLineNumber, line.itemName(), line.quantity(), line.unitPrice(),
+                    line.vatRate(), line.amountBeforeVat(), line.vatAmount(), line.amountAfterVat());
             writer.writeLine(line, handlerConfig.scale());
             processedRowCount++;
+
             beforeTotal = beforeTotal.add(line.amountBeforeVat());
             vatTotal = vatTotal.add(line.vatAmount());
             afterTotal = afterTotal.add(line.amountAfterVat());
@@ -346,15 +381,32 @@ public final class WorkbookProcessor {
         }
 
         private BigDecimal parseNumber(String value, InvoiceColumn column, List<RowError> rowErrors) {
-            if (value.isBlank()) { rowErrors.add(error(column, value, ErrorCode.MISSING_VALUE, "value is required")); return null; }
-            if (NumericPreservingDataFormatter.isPercent(value) && column != InvoiceColumn.VAT_RATE) {
-                rowErrors.add(error(column, value, ErrorCode.INVALID_FORMAT, "percentage format is allowed only for vat_rate"));
+            if (value.isBlank()) {
+                rowErrors.add(error(column, value, ErrorCode.MISSING_VALUE, "value is required"));
                 return null;
             }
-            if (NumericPreservingDataFormatter.isPercent(value)) value = NumericPreservingDataFormatter.removePercentMarker(value);
-            if (value.contains(",") || value.contains("%")) { rowErrors.add(error(column, value, ErrorCode.INVALID_FORMAT, "value has an invalid number format")); return null; }
-            try { return new BigDecimal(value); }
-            catch (NumberFormatException exception) { rowErrors.add(error(column, value, ErrorCode.NOT_A_NUMBER, "'" + value + "' is not a valid number")); return null; }
+
+            if (NumericPreservingDataFormatter.isPercent(value) && column != InvoiceColumn.VAT_RATE) {
+                rowErrors.add(error(column, value, ErrorCode.INVALID_FORMAT,
+                        "percentage format is allowed only for vat_rate"));
+                return null;
+            }
+
+            if (NumericPreservingDataFormatter.isPercent(value)) {
+                value = NumericPreservingDataFormatter.removePercentMarker(value);
+            }
+
+            if (value.contains(",") || value.contains("%")) {
+                rowErrors.add(error(column, value, ErrorCode.INVALID_FORMAT, "value has an invalid number format"));
+                return null;
+            }
+
+            try {
+                return new BigDecimal(value);
+            } catch (NumberFormatException exception) {
+                rowErrors.add(error(column, value, ErrorCode.NOT_A_NUMBER, "'" + value + "' is not a valid number"));
+                return null;
+            }
         }
 
         private String value(InvoiceColumn column) { return cells.getOrDefault(mapping.get(column), ""); }
