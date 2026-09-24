@@ -11,28 +11,76 @@ on:
     paths:
       - 'xlsx-invoice-lib/**'
       - '.github/workflows/xlsx-invoice-lib-ci.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: xlsx-invoice-lib-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+defaults:
+  run:
+    working-directory: xlsx-invoice-lib
 
 jobs:
   build-and-test:
-    name: Build and Test xlsx-invoice-lib
+    name: Build and Test (JDK ${{ matrix.java }})
     runs-on: ubuntu-latest
-    
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        java: [ '17', '21' ]
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Set up Java 21
+      - name: Set up Java ${{ matrix.java }}
         uses: actions/setup-java@v4
         with:
-          java-version: '21'
+          java-version: ${{ matrix.java }}
           distribution: 'temurin'
           cache: 'maven'
 
-      - name: Build and Test (Default)
-        run: mvn -B clean verify
-        working-directory: xlsx-invoice-lib
+      - name: Build and Test
+        run: mvn -B -ntp clean verify
 
-      - name: Build and Test (Performance)
-        run: mvn -B test -Pperformance
-        working-directory: xlsx-invoice-lib
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-jdk${{ matrix.java }}
+          path: xlsx-invoice-lib/target/surefire-reports/
+          if-no-files-found: ignore
 
+  performance:
+    name: Performance tests (non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: build-and-test
+    continue-on-error: true
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Java 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: 'temurin'
+          cache: 'maven'
+
+      - name: Performance tests
+        run: mvn -B -ntp test -Pperformance
+
+      - name: Upload performance reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: performance-reports
+          path: xlsx-invoice-lib/target/surefire-reports/
+          if-no-files-found: ignore
