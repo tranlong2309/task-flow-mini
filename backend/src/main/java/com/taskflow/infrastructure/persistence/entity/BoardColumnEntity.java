@@ -12,6 +12,7 @@ public class BoardColumnEntity {
     private Long id;
 
     @Column(name = "board_id", nullable = false)
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.BINARY)
     private UUID boardId;
 
     @Column(nullable = false, length = 100)
@@ -25,6 +26,9 @@ public class BoardColumnEntity {
 
     @Column(name = "created_at")
     private Instant createdAt;
+
+    @Column(name = "tone", length = 20)
+    private String tone;
 
     public BoardColumnEntity() {}
 
@@ -40,4 +44,6 @@ public class BoardColumnEntity {
     public void setIsDefault(Boolean isDefault) { this.isDefault = isDefault; }
     public Instant getCreatedAt() { return createdAt; }
     public void setCreatedAt(Instant createdAt) { this.createdAt = createdAt; }
+    public String getTone() { return tone; }
+    public void setTone(String tone) { this.tone = tone; }
 }
