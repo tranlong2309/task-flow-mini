@@ -13,9 +13,11 @@ import java.util.Map;
 public class BoardController {
 
     private final CreateBoardUseCase createBoardUseCase;
+    private final com.taskflow.application.port.in.GetBoardPermissionUseCase getBoardPermissionUseCase;
 
-    public BoardController(CreateBoardUseCase createBoardUseCase) {
+    public BoardController(CreateBoardUseCase createBoardUseCase, com.taskflow.application.port.in.GetBoardPermissionUseCase getBoardPermissionUseCase) {
         this.createBoardUseCase = createBoardUseCase;
+        this.getBoardPermissionUseCase = getBoardPermissionUseCase;
     }
 
     @PostMapping("/boards")
@@ -31,6 +33,20 @@ public class BoardController {
                 "description", board.getDescription(),
                 "teamId", board.getTeamId(),
                 "createdAt", board.getCreatedAt()
+        ));
+    }
+
+    @GetMapping("/boards/{boardId}/permissions")
+    public ResponseEntity<?> getPermissions(
+            @PathVariable java.util.UUID boardId,
+            @org.springframework.security.core.annotation.AuthenticationPrincipal com.taskflow.infrastructure.security.CustomUserDetails userDetails
+    ) {
+        com.taskflow.domain.model.BoardPermission permission = getBoardPermissionUseCase.getPermissions(boardId, userDetails.getId());
+        return ResponseEntity.ok(Map.of(
+                "canCreateTask", permission.isCanCreateTask(),
+                "canEditTask", permission.isCanEditTask(),
+                "canDeleteBoard", permission.isCanDeleteBoard(),
+                "canViewReport", permission.isCanViewReport()
         ));
     }
 }
