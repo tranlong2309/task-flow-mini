@@ -1,3 +1,7 @@
 /target/
 **/.gradle/
 *.class
+.classpath
+.project
+.settings/
+docs/promp.md
