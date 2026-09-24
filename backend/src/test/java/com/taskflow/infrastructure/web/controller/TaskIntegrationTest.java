@@ -34,6 +34,9 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
+import com.taskflow.infrastructure.persistence.entity.BoardColumnEntity;
+import com.taskflow.infrastructure.persistence.repository.SpringDataBoardColumnRepository;
+
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles("test")
@@ -47,6 +50,9 @@ public class TaskIntegrationTest {
 
     @Autowired
     private SpringDataBoardRepository boardRepository;
+
+    @Autowired
+    private SpringDataBoardColumnRepository boardColumnRepository;
 
     @Autowired
     private SpringDataBoardMemberRepository boardMemberRepository;
@@ -77,6 +83,7 @@ public class TaskIntegrationTest {
     void setUp() throws Exception {
         taskHistoryRepository.deleteAll();
         taskRepository.deleteAll();
+        boardColumnRepository.deleteAll();
         boardMemberRepository.deleteAll();
         boardRepository.deleteAll();
         userRepository.deleteAll();
@@ -109,6 +116,18 @@ public class TaskIntegrationTest {
         board.setUpdatedAt(Instant.now());
         board = boardRepository.save(board);
         boardId = board.getId();
+
+        BoardColumnEntity todoCol = new BoardColumnEntity();
+        todoCol.setBoardId(boardId);
+        todoCol.setName("Todo");
+        todoCol.setPosition(0);
+        boardColumnRepository.save(todoCol);
+
+        BoardColumnEntity doneCol = new BoardColumnEntity();
+        doneCol.setBoardId(boardId);
+        doneCol.setName("Done");
+        doneCol.setPosition(1);
+        boardColumnRepository.save(doneCol);
 
         BoardMemberEntity member = new BoardMemberEntity();
         member.setBoardId(board.getId());
@@ -177,6 +196,34 @@ public class TaskIntegrationTest {
                 .param("priority", "MEDIUM"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].title").value("Updated title"));
+
+        // 4.1. Update Status (Move to Done column)
+        mockMvc.perform(patch("/api/v1/tasks/" + taskId + "/status")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "statusColumnId", 2L,
+                        "note", "Task is finished"
+                ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.statusColumnId").value(2))
+                .andExpect(jsonPath("$.completedAt").isNotEmpty());
+
+        // Verify task history recorded for status change + note
+        assertEquals(3, taskHistoryRepository.count()); // 1 for assignee, 1 for status, 1 for note
+
+        // 4.2. Drag and drop task (Move within column)
+        mockMvc.perform(patch("/api/v1/tasks/" + taskId + "/move")
+                .header("Authorization", "Bearer " + userToken)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(objectMapper.writeValueAsString(Map.of(
+                        "sourceColumnId", 2L,
+                        "targetColumnId", 2L,
+                        "sourceIndex", 0,
+                        "targetIndex", 1
+                ))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.position").value(1));
 
         // 5. Delete Task (Soft delete)
         mockMvc.perform(delete("/api/v1/tasks/" + taskId)

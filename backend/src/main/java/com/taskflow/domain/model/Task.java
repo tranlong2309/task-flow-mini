@@ -16,10 +16,12 @@ public class Task {
     private Instant createdAt;
     private Instant updatedAt;
     private Instant deletedAt;
+    private Integer position;
+    private Instant completedAt;
 
     public Task() {}
 
-    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt) {
+    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt) {
         this.id = id;
         this.boardId = boardId;
         this.title = title;
@@ -32,6 +34,8 @@ public class Task {
         this.createdAt = createdAt;
         this.updatedAt = updatedAt;
         this.deletedAt = deletedAt;
+        this.position = position;
+        this.completedAt = completedAt;
     }
 
     public UUID getId() { return id; }
@@ -58,4 +62,8 @@ public class Task {
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+    public Integer getPosition() { return position; }
+    public void setPosition(Integer position) { this.position = position; }
+    public Instant getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 }

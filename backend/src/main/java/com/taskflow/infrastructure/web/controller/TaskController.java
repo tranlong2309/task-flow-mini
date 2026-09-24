@@ -27,17 +27,23 @@ public class TaskController {
     private final GetTaskUseCase getTaskUseCase;
     private final SearchTasksUseCase searchTasksUseCase;
     private final DeleteTaskUseCase deleteTaskUseCase;
+    private final UpdateTaskStatusUseCase updateTaskStatusUseCase;
+    private final MoveTaskUseCase moveTaskUseCase;
 
     public TaskController(CreateTaskUseCase createTaskUseCase,
                           UpdateTaskUseCase updateTaskUseCase,
                           GetTaskUseCase getTaskUseCase,
                           SearchTasksUseCase searchTasksUseCase,
-                          DeleteTaskUseCase deleteTaskUseCase) {
+                          DeleteTaskUseCase deleteTaskUseCase,
+                          UpdateTaskStatusUseCase updateTaskStatusUseCase,
+                          MoveTaskUseCase moveTaskUseCase) {
         this.createTaskUseCase = createTaskUseCase;
         this.updateTaskUseCase = updateTaskUseCase;
         this.getTaskUseCase = getTaskUseCase;
         this.searchTasksUseCase = searchTasksUseCase;
         this.deleteTaskUseCase = deleteTaskUseCase;
+        this.updateTaskStatusUseCase = updateTaskStatusUseCase;
+        this.moveTaskUseCase = moveTaskUseCase;
     }
 
     @PostMapping("/tasks")
@@ -107,6 +113,38 @@ public class TaskController {
         try {
             deleteTaskUseCase.deleteTask(taskId, userDetails.getId());
             return ResponseEntity.noContent().build();
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/tasks/{taskId}/status")
+    public ResponseEntity<?> updateStatus(@PathVariable UUID taskId,
+                                          @RequestBody Map<String, Object> payload,
+                                          @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            Long statusColumnId = Long.valueOf(payload.get("statusColumnId").toString());
+            String note = payload.containsKey("note") ? (String) payload.get("note") : null;
+            
+            Task task = updateTaskStatusUseCase.updateTaskStatus(taskId, statusColumnId, note, userDetails.getId());
+            return ResponseEntity.ok(task);
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        }
+    }
+
+    @PatchMapping("/tasks/{taskId}/move")
+    public ResponseEntity<?> moveTask(@PathVariable UUID taskId,
+                                      @RequestBody Map<String, Object> payload,
+                                      @AuthenticationPrincipal CustomUserDetails userDetails) {
+        try {
+            Long sourceColumnId = Long.valueOf(payload.get("sourceColumnId").toString());
+            Long targetColumnId = Long.valueOf(payload.get("targetColumnId").toString());
+            int sourceIndex = Integer.parseInt(payload.get("sourceIndex").toString());
+            int targetIndex = Integer.parseInt(payload.get("targetIndex").toString());
+            
+            Task task = moveTaskUseCase.moveTask(taskId, sourceColumnId, targetColumnId, sourceIndex, targetIndex, userDetails.getId());
+            return ResponseEntity.ok(task);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
         }

@@ -9,6 +9,8 @@ import java.util.UUID;
 
 public interface TaskRepositoryPort {
     Task save(Task task);
+    void saveAll(List<Task> tasks);
     Optional<Task> findById(UUID id);
+    List<Task> findByStatusColumnIdOrderByPositionAsc(Long statusColumnId);
     List<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly);
 }

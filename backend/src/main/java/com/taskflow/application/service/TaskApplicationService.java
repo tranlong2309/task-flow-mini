@@ -58,7 +58,7 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
             throw new AccessDeniedException("User does not have permission to create task");
         }
 
-        Task task = new Task(UUID.randomUUID(), boardId, title, description, statusColumnId, assigneeId, priority, dueDate, createdBy, Instant.now(), Instant.now(), null);
+        Task task = new Task(UUID.randomUUID(), boardId, title, description, statusColumnId, assigneeId, priority, dueDate, createdBy, Instant.now(), Instant.now(), null, 0, null);
         return taskRepositoryPort.save(task);
     }
 

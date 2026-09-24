@@ -59,7 +59,7 @@ class TaskApplicationServiceTest {
     void updateTask_shouldThrowException_whenUserDoesNotHavePermission() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
         
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(getBoardPermissionUseCase.getPermissions(boardId, 3L)).thenReturn(new BoardPermission(true, false, false, false)); // No edit permission
@@ -73,7 +73,7 @@ class TaskApplicationServiceTest {
     void updateTask_shouldSucceed_whenUserIsAssignee() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
         
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(taskRepositoryPort.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
@@ -88,7 +88,7 @@ class TaskApplicationServiceTest {
     void updateTask_shouldRecordHistory_whenAssigneeIsChanged() {
         UUID taskId = UUID.randomUUID();
         UUID boardId = UUID.randomUUID();
-        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null);
+        Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null);
         
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(getBoardPermissionUseCase.getPermissions(boardId, 3L)).thenReturn(new BoardPermission(true, true, false, false)); // Has edit permission

@@ -32,8 +32,20 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
     }
 
     @Override
+    public void saveAll(List<Task> tasks) {
+        List<TaskEntity> entities = tasks.stream().map(this::toEntity).collect(Collectors.toList());
+        springDataTaskRepository.saveAll(entities);
+    }
+
+    @Override
     public Optional<Task> findById(UUID id) {
         return springDataTaskRepository.findById(id).map(this::toDomain);
+    }
+
+    @Override
+    public List<Task> findByStatusColumnIdOrderByPositionAsc(Long statusColumnId) {
+        return springDataTaskRepository.findByStatusColumnIdOrderByPositionAsc(statusColumnId)
+                .stream().map(this::toDomain).collect(Collectors.toList());
     }
 
     @Override
@@ -85,6 +97,8 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
         entity.setCreatedAt(task.getCreatedAt());
         entity.setUpdatedAt(task.getUpdatedAt());
         entity.setDeletedAt(task.getDeletedAt());
+        entity.setPosition(task.getPosition() != null ? task.getPosition() : 0);
+        entity.setCompletedAt(task.getCompletedAt());
         return entity;
     }
 
@@ -101,7 +115,9 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
                 entity.getCreatedBy(),
                 entity.getCreatedAt(),
                 entity.getUpdatedAt(),
-                entity.getDeletedAt()
+                entity.getDeletedAt(),
+                entity.getPosition(),
+                entity.getCompletedAt()
         );
     }
 }

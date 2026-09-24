@@ -45,6 +45,12 @@ public class TaskEntity {
     @Column(name = "deleted_at")
     private Instant deletedAt;
 
+    @Column(nullable = false)
+    private Integer position = 0;
+
+    @Column(name = "completed_at")
+    private Instant completedAt;
+
     public TaskEntity() {}
 
     // Getters and Setters
@@ -72,4 +78,8 @@ public class TaskEntity {
     public void setUpdatedAt(Instant updatedAt) { this.updatedAt = updatedAt; }
     public Instant getDeletedAt() { return deletedAt; }
     public void setDeletedAt(Instant deletedAt) { this.deletedAt = deletedAt; }
+    public Integer getPosition() { return position; }
+    public void setPosition(Integer position) { this.position = position; }
+    public Instant getCompletedAt() { return completedAt; }
+    public void setCompletedAt(Instant completedAt) { this.completedAt = completedAt; }
 }
