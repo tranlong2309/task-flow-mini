@@ -105,3 +105,56 @@ export interface Session {
   token: string
   user: User
 }
+
+// --- SPEC-DRIVEN TYPES (Aligned with docs/api-spec.yaml & docs/domain-model.md) ---
+
+export interface ProblemDetail {
+  type: string;
+  title: string;
+  status: number;
+  detail: string;
+  instance?: string;
+  trackingId?: string;
+  violations?: { field: string; message: string }[];
+}
+
+export interface WorkOrderSummary {
+  id: string;
+  title: string;
+  statusColumnId: number;
+  statusColumnName: string;
+  priority: Priority;
+  dueDate: string; // ISO-8601
+  assigneeId?: number;
+  isBlocked: boolean;
+  isOverdue: boolean;
+  createdAt: string;
+}
+
+export interface PagedWorkOrderResponse {
+  items: WorkOrderSummary[];
+  totalCount: number;
+  page: number;
+  pageSize: number;
+  hasNext: boolean;
+}
+
+export interface WorkOrderResponse {
+  id: string;
+  boardId: string;
+  title: string;
+  description: string;
+  statusColumnId: number;
+  statusColumnName: string;
+  priority: Priority;
+  dueDate: string;
+  isOverdue: boolean;
+  assigneeId?: number;
+  isBlocked: boolean;
+  blockedReason?: string;
+  blockedAt?: string;
+  completedAt?: string;
+  createdBy: number;
+  createdAt: string;
+  updatedAt: string;
+}
