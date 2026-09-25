@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { Users, Plus, MoreHorizontal, Pencil, Trash, X } from 'lucide-react'
+import { Plus, Pencil, Trash, X } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { User } from '../../types/domain'
 import { userService } from '../../lib/api/services'

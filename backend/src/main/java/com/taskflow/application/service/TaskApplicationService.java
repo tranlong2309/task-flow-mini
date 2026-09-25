@@ -138,9 +138,15 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
     }
 
     @Override
-    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, Long requesterId, int page, int size) {
+    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, 
+                                           Instant assignedDateFrom, Instant assignedDateTo, 
+                                           Instant startDateFrom, Instant startDateTo, 
+                                           Instant endDateFrom, Instant endDateTo, 
+                                           Long requesterId, int page, int size) {
         getBoardPermissionUseCase.getPermissions(boardId, requesterId);
-        return taskRepositoryPort.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, page, size);
+        return taskRepositoryPort.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, 
+                                              assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo, 
+                                              page, size);
     }
 
     @Override

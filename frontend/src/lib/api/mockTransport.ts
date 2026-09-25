@@ -1,5 +1,5 @@
 import { demoSessions, notifications, projects, seedBoards, seedTickets, users } from '../../mocks/data'
-import type { ApiTransport, CreateTaskInput, CreateTicketInput, UpdateTaskInput, UpdateTicketInput } from './apiTransport'
+import type { CreateTaskInput, CreateTicketInput, UpdateTaskInput, UpdateTicketInput } from './apiTransport'
 import type { Board, BoardColumn, Notification, Project, Session, Task, Ticket, User } from '../../types/domain'
 
 let boards = structuredClone(seedBoards)
@@ -9,7 +9,7 @@ const wait = (ms = 220) => new Promise((resolve) => setTimeout(resolve, ms))
 const copy = <T>(value: T): T => structuredClone(value)
 const fail = (status: number, detail: string): never => { throw new Error(`${status}: ${detail}`) }
 
-export const mockTransport: ApiTransport = {
+export const mockTransport = {
   async login(email: string, password: string): Promise<Session> {
     await wait(300)
     if (password !== 'password' || !demoSessions[email]) fail(401, 'Invalid email or password')
@@ -22,7 +22,7 @@ export const mockTransport: ApiTransport = {
     return copy(session.user)
   },
   async listProjects(): Promise<Project[]> { await wait(); return copy(projects) },
-  async getBoard(projectId: number): Promise<Board> {
+  async getBoard(projectId: number | string, _filters?: import('./apiTransport').TaskFilters): Promise<Board> {
     await wait()
     const board = boards.find((item) => item.projectId === projectId)
     if (!board) throw new Error('404: Project board not found')
@@ -73,10 +73,10 @@ export const mockTransport: ApiTransport = {
   },
   async getNotifications(): Promise<Notification[]> { await wait(120); return copy(inbox) },
   async markNotificationRead(id: number) { await wait(100); inbox = inbox.map((item) => item.id === id ? { ...item, read: true } : item) },
-  async updateColumns(columns: BoardColumn[]) {
+  async updateColumns(_projectId: string | number, columns: BoardColumn[]): Promise<BoardColumn[]> {
     await wait(260)
     const board = boards[0]
     board.columns = columns.map((column, index) => ({ ...column, order: index + 1 }))
-    return copy(board)
+    return copy(board.columns)
   },
 }

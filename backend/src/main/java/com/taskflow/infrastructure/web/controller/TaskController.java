@@ -115,11 +115,20 @@ public class TaskController {
                                            @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
                                            @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
                                            @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean overdueOnly,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateFrom,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateTo,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateFrom,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateTo,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateFrom,
+                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateTo,
                                            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
                                            @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
                                            @AuthenticationPrincipal CustomUserDetails userDetails) {
         if (size > 100) size = 100;
-        com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, search, overdueOnly, userDetails.getId(), page, size);
+        com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(
+            boardId, statusColumnId, assigneeId, priority, search, overdueOnly, 
+            assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
+            userDetails.getId(), page, size);
         return ResponseEntity.ok(paged);
     }
 
@@ -129,6 +138,12 @@ public class TaskController {
                                                  @org.springframework.web.bind.annotation.RequestParam(required = false) String status,
                                                  @org.springframework.web.bind.annotation.RequestParam(required = false) Long assigneeId,
                                                  @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateFrom,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateTo,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateFrom,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateTo,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateFrom,
+                                                 @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateTo,
                                                  @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
                                                  @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
                                                  @AuthenticationPrincipal CustomUserDetails userDetails) {
@@ -152,7 +167,10 @@ public class TaskController {
 
         try {
             if (size > 100) size = 100;
-            com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(boardId, statusColumnId, assigneeId, priority, q, null, userDetails.getId(), page, size);
+            com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(
+                boardId, statusColumnId, assigneeId, priority, q, null, 
+                assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
+                userDetails.getId(), page, size);
             
             List<com.taskflow.domain.model.TaskSearchResult> items = paged.content().stream().map(t -> 
                 new com.taskflow.domain.model.TaskSearchResult(

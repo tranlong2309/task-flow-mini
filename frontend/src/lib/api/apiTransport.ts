@@ -5,6 +5,18 @@ export type UpdateTaskInput = Partial<Omit<CreateTaskInput, 'projectId' | 'board
 export type CreateTicketInput = Omit<Ticket, 'id' | 'updatedAt'>
 export type UpdateTicketInput = Partial<Omit<Ticket, 'id' | 'taskId'>>
 
+export interface TaskFilters {
+  search?: string;
+  assigneeId?: string | number;
+  priority?: string;
+  assignedDateFrom?: string;
+  assignedDateTo?: string;
+  startDateFrom?: string;
+  startDateTo?: string;
+  endDateFrom?: string;
+  endDateTo?: string;
+}
+
 export interface ApiTransport {
   login(email: string, password: string): Promise<Session>
   getMe(token: string): Promise<User>
@@ -16,7 +28,7 @@ export interface ApiTransport {
   createProject(input: { name: string, description: string, teamId: number }): Promise<Project>
   updateProject(id: string | number, input: { name: string, description: string }): Promise<Project>
   deleteProject(id: string | number): Promise<void>
-  getBoard(projectId: string | number): Promise<Board>
+  getBoard(projectId: string | number, filters?: TaskFilters): Promise<Board>
   moveTask(taskId: string | number, columnId: string | number): Promise<Task>
   updateColumns(projectId: string | number, columns: BoardColumn[]): Promise<BoardColumn[]>
   getUsers(): Promise<User[]>

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { FolderKanban, Plus, MoreHorizontal, Pencil, Trash, X } from 'lucide-react'
+import { Plus, Pencil, Trash, X } from 'lucide-react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import type { Project } from '../../types/domain'
 import { projectService } from '../../lib/api/services'

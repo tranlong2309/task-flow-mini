@@ -15,10 +15,11 @@ const httpTransport: ApiTransport = {
   createProject: (input) => apiClient.post<Project>('/boards', input).then(({ data }) => data),
   updateProject: (id, input) => apiClient.put<Project>(`/boards/${id}`, input).then(({ data }) => data),
   deleteProject: (id) => apiClient.delete(`/boards/${id}`).then(() => undefined),
-  getBoard: async (projectId) => {
+  getBoard: async (projectId, filters) => {
+    const queryParams = filters ? new URLSearchParams(Object.entries(filters).filter(([_, v]) => v !== undefined && v !== '') as string[][]).toString() : '';
     const [boardResponse, tasksResponse] = await Promise.all([
       apiClient.get(`/boards/${projectId}`),
-      apiClient.get(`/boards/${projectId}/tasks`)
+      apiClient.get(`/boards/${projectId}/tasks${queryParams ? `?${queryParams}` : ''}`)
     ]);
     const board = boardResponse.data;
     const tasks = tasksResponse.data.content || tasksResponse.data.items || (Array.isArray(tasksResponse.data) ? tasksResponse.data : []);

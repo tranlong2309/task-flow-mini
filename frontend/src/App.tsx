@@ -19,6 +19,8 @@ import { Reports } from './features/reports/Reports'
 import { BoardSettings } from './features/settings/BoardSettings'
 import { ProjectManagement } from './features/settings/ProjectManagement'
 import { EmployeeManagement } from './features/settings/EmployeeManagement'
+import { FilterPanel } from './features/board/FilterPanel'
+import type { TaskFilters } from './lib/api/apiTransport'
 
 import './App.css'
 
@@ -65,7 +67,16 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
   const qc = useQueryClient()
   const { view, setView, search, setSearch, priority, setPriority, selectedTaskId, setSelectedTaskId, selectedProjectId, setSelectedProjectId } = useAppStore()
   
-  const boardQuery = useQuery({ queryKey: ['board', selectedProjectId], queryFn: () => boardService.get(selectedProjectId) })
+  const [taskFilters, setTaskFilters] = useState<TaskFilters>({})
+  const [showFilters, setShowFilters] = useState(false)
+  const [debouncedSearch, setDebouncedSearch] = useState(search)
+
+  useEffect(() => {
+    const timer = setTimeout(() => setDebouncedSearch(search), 300)
+    return () => clearTimeout(timer)
+  }, [search])
+
+  const boardQuery = useQuery({ queryKey: ['board', selectedProjectId, taskFilters, debouncedSearch, priority], queryFn: () => boardService.get(selectedProjectId, { ...taskFilters, search: debouncedSearch || undefined, priority: priority !== 'all' ? priority as any : undefined }) })
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: taskService.listUsers })
   const projectQuery = useQuery({ queryKey: ['projects'], queryFn: projectService.list })
   const notificationQuery = useQuery({ queryKey: ['notifications'], queryFn: notificationService.list })
@@ -94,11 +105,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
     onSettled: () => qc.invalidateQueries({ queryKey: ['board', selectedProjectId] }),
   })
 
-  const filteredTasks = useMemo(() => board?.tasks.filter((task) => {
-    const matchesSearch = !search || `${task.title} ${task.description}`.toLowerCase().includes(search.toLowerCase())
-    const matchesPriority = priority === 'all' || task.priority === priority
-    return matchesSearch && matchesPriority
-  }) ?? [], [board?.tasks, priority, search])
+  const filteredTasks = useMemo(() => board?.tasks ?? [], [board?.tasks])
 
   if (boardQuery.isLoading) return <div className="loading-screen"><Sparkles size={20} /> Loading your workspace...</div>
   if (boardQuery.isError || !board) return <div className="loading-screen error">Could not load the board. Please try again.</div>
@@ -123,22 +130,25 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
           <div className="brand-mark"><Sparkles size={16} /></div>
           <span>taskflow</span>
         </div>
-        <div className="workspace-switcher">
-          <div className="workspace-icon">W</div>
-          <div><strong>Workspace</strong><small>Acme Studio</small></div>
-          <ChevronDown size={15} />
-        </div>
-        <label className="project-switcher">
-          <span className="project-color" />
-          <div>
-            <small>Project</small>
-            <select value={selectedProjectId} onChange={(event) => setSelectedProjectId(event.target.value)}>
-              {projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}
-            </select>
+        <div className="workspace-switcher" style={{ position: 'relative' }}>
+          <div className="workspace-icon" style={{ background: '#7e64f2' }}>P</div>
+          <div style={{ flex: 1, overflow: 'hidden' }}>
+            <strong>Project</strong>
+            <small style={{ display: 'block', textOverflow: 'ellipsis', whiteSpace: 'nowrap', overflow: 'hidden' }}>
+              {projects.find(p => p.id === selectedProjectId)?.name || 'Select a project'}
+            </small>
           </div>
-        </label>
+          <ChevronDown size={15} />
+          <select 
+            value={selectedProjectId} 
+            onChange={(event) => setSelectedProjectId(event.target.value)}
+            style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', opacity: 0, cursor: 'pointer' }}
+          >
+            {projects.map((project) => <option value={project.id} key={project.id}>{project.name}</option>)}
+          </select>
+        </div>
         <nav className="nav">
-          <p className="nav-label">Workspace</p>
+          <p className="nav-label">Project</p>
           <button className={view === 'board' ? 'nav-item active' : 'nav-item'} onClick={() => setView('board')}>
             <LayoutDashboard size={18} /> My board <span className="nav-count">{board.tasks.length}</span>
           </button>
@@ -179,7 +189,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
       <main className="main">
         <header className="topbar">
           <div className="breadcrumbs">
-            <span>Workspace</span><span>/</span><strong>Website Redesign</strong>
+            <span>Projects</span><span>/</span><strong>{projects.find(p => p.id === selectedProjectId)?.name || 'Project'}</strong>
           </div>
           <div className="top-actions">
             <label className="search">
@@ -214,8 +224,18 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
                 <h1>{board.name}</h1>
                 <p>{board.description}</p>
               </div>
-              <div className="heading-actions">
-                <button className="button secondary"><Filter size={16} /> Filter</button>
+              <div className="heading-actions" style={{ position: 'relative' }}>
+                <button className="button secondary" onClick={() => setShowFilters(!showFilters)}>
+                  <Filter size={16} /> Filter
+                </button>
+                {showFilters && (
+                  <FilterPanel 
+                    filters={taskFilters} 
+                    onChange={setTaskFilters} 
+                    users={users} 
+                    onClose={() => setShowFilters(false)} 
+                  />
+                )}
                 <button className="button primary" onClick={() => setShowCreate(true)}>
                   <Plus size={17} /> New task
                 </button>

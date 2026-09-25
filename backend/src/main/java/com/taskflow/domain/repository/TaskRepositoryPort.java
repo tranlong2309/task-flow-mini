@@ -16,7 +16,11 @@ public interface TaskRepositoryPort {
     void saveAll(List<Task> tasks);
     Optional<Task> findById(UUID id);
     List<Task> findByStatusColumnIdOrderByPositionAsc(Long statusColumnId);
-        PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, int page, int size);
+    PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, 
+                                    Instant assignedDateFrom, Instant assignedDateTo, 
+                                    Instant startDateFrom, Instant startDateTo, 
+                                    Instant endDateFrom, Instant endDateTo, 
+                                    int page, int intSize);
     List<Task> searchTasksByBoardIds(List<UUID> boardIds, Long assigneeId, Instant from, Instant to);
     long countByBoardId(UUID boardId);
     long countByBoardIdAndCompletedAtIsNotNull(UUID boardId);

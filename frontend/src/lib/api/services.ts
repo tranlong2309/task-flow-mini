@@ -4,7 +4,7 @@ import { httpTransport } from './httpTransport'
 import type { Board, BoardColumn, Notification, Project, Session, Task, Ticket, User } from '../../types/domain'
 import type { ApiTransport, CreateTaskInput, CreateTicketInput, UpdateTaskInput, UpdateTicketInput } from './apiTransport'
 
-const transport: ApiTransport = env.apiMode === 'mock' ? mockTransport : httpTransport
+const transport: ApiTransport = env.apiMode === 'mock' ? mockTransport as unknown as ApiTransport : httpTransport
 
 export const authService = {
   login: (email: string, password: string): Promise<Session> => transport.login(email, password),
@@ -23,7 +23,7 @@ export const projectService = {
   delete: (id: string | number): Promise<void> => transport.deleteProject(id),
 }
 export const boardService = {
-  get: (projectId: string | number): Promise<Board> => transport.getBoard(projectId),
+  get: (projectId: string | number, filters?: import('./apiTransport').TaskFilters): Promise<Board> => transport.getBoard(projectId, filters),
   moveTask: (taskId: string | number, columnId: string | number): Promise<Task> => transport.moveTask(taskId, columnId),
   updateColumns: (projectId: string | number, columns: Board['columns']): Promise<BoardColumn[]> => transport.updateColumns(projectId, columns),
 }

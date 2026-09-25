@@ -56,7 +56,11 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
     }
 
     @Override
-    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, int page, int size) {
+    public PagedResponse<Task> searchTasks(UUID boardId, Long statusColumnId, Long assigneeId, Priority priority, String search, Boolean overdueOnly, 
+                                           Instant assignedDateFrom, Instant assignedDateTo, 
+                                           Instant startDateFrom, Instant startDateTo, 
+                                           Instant endDateFrom, Instant endDateTo, 
+                                           int page, int size) {
         Specification<TaskEntity> spec = (root, query, cb) -> {
             List<Predicate> predicates = new ArrayList<>();
             predicates.add(cb.equal(root.get("boardId"), boardId));
@@ -82,6 +86,14 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
                 predicates.add(cb.lessThan(root.get("dueDate"), Instant.now()));
                 predicates.add(cb.isNull(root.get("completedAt")));
             }
+            
+            // Map Assigned Date and Start Date to createdAt, End Date to dueDate
+            if (assignedDateFrom != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), assignedDateFrom));
+            if (assignedDateTo != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), assignedDateTo));
+            if (startDateFrom != null) predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), startDateFrom));
+            if (startDateTo != null) predicates.add(cb.lessThanOrEqualTo(root.get("createdAt"), startDateTo));
+            if (endDateFrom != null) predicates.add(cb.greaterThanOrEqualTo(root.get("dueDate"), endDateFrom));
+            if (endDateTo != null) predicates.add(cb.lessThanOrEqualTo(root.get("dueDate"), endDateTo));
 
             return cb.and(predicates.toArray(new Predicate[0]));
         };
