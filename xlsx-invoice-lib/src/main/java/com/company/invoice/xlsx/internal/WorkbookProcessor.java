@@ -124,7 +124,7 @@ public final class WorkbookProcessor {
     public static Invoice calculate(InvoiceConfig config, List<InvoiceItem> items) {
         Calculator.CalculationResult rawResult = Calculator.calculate(config, items);
         List<RowError> mappedErrors = rawResult.errors().stream()
-                .map(e -> new RowError("memory", e.row(), e.cell(), e.column(), e.value(), e.code(), e.message()))
+                .map(e -> new RowError("memory", e.rowNumber(), e.cellAddress(), e.columnName(), e.offendingValue(), e.errorCode(), e.message()))
                 .toList();
 
         Calculator.CalculationResult result = new Calculator.CalculationResult(rawResult.lines(), rawResult.totals(),
@@ -360,7 +360,7 @@ public final class WorkbookProcessor {
 
             if (calculation.isEmpty()) {
                 addErrors(rawCalcErrors.stream()
-                        .map(e -> new RowError(sheetName, e.row(), e.cell(), e.column(), e.value(), e.code(),
+                        .map(e -> new RowError(sheetName, e.rowNumber(), e.cellAddress(), e.columnName(), e.offendingValue(), e.errorCode(),
                                 e.message()))
                         .toList());
                 skippedRowCount++;
@@ -426,8 +426,10 @@ public final class WorkbookProcessor {
         private ProcessingResult result() {
             if (mapping == null) throw new ExcelFormatException("Header row not found in sheet '" + sheetName + "'");
             if (!sawDataRow) throw new ExcelFormatException("sheet '" + sheetName + "' has a header but no data rows");
-            InvoiceTotals totals = new InvoiceTotals(beforeTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode()),
-                    vatTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode()), afterTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode()));
+            InvoiceTotals totals = new InvoiceTotals(
+                    Calculator.stripFractionIfZero(beforeTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode())),
+                    Calculator.stripFractionIfZero(vatTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode())),
+                    Calculator.stripFractionIfZero(afterTotal.setScale(handlerConfig.scale(), handlerConfig.roundingMode())));
             try (OutputStream output = Files.newOutputStream(temporaryOutput)) {
                 writer.writeTotal(totals);
                 writer.writeErrors(handlerConfig, errors.values(), errors.omitted());

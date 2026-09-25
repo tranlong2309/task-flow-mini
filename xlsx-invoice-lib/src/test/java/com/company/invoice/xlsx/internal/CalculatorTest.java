@@ -17,7 +17,7 @@ class CalculatorTest {
     @Test
     void reportsMissingAndInvalidFieldsTogether() {
         Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(),
-                List.of(new InvoiceItem(null, null, null, null)), "Items");
+                List.of(new InvoiceItem(null, null, null, null)));
 
         assertThat(result.lines()).isEmpty();
         assertThat(result.errors()).extracting(error -> error.errorCode())
@@ -27,7 +27,7 @@ class CalculatorTest {
     @Test
     void reportsLongNamesAndTooManyQuantityDecimals() {
         Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(),
-                List.of(new InvoiceItem("x".repeat(256), new BigDecimal("1.2345"), BigDecimal.ONE, BigDecimal.ZERO)), "Items");
+                List.of(new InvoiceItem("x".repeat(256), new BigDecimal("1.2345"), BigDecimal.ONE, BigDecimal.ZERO)));
 
         assertThat(result.errors()).extracting(error -> error.errorCode())
                 .containsExactly(ErrorCode.TEXT_TOO_LONG, ErrorCode.TOO_MANY_DECIMALS);
@@ -44,6 +44,27 @@ class CalculatorTest {
                     new BigDecimal("9000000000000"), BigDecimal.ZERO));
         }
         assertThatThrownBy(() -> Calculator.calculate(InvoiceConfig.builder().build(), largeInvoice))
-                .isInstanceOf(com.company.invoice.xlsx.InvoiceException.class);
+                .isInstanceOf(InvoiceException.class);
+    }
+
+    @Test
+    void stripsTrailingZerosForIntegerTotals() {
+        Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(), List.of(
+                new InvoiceItem("Laptop", new BigDecimal("2"), new BigDecimal("15000000"), new BigDecimal("10")),
+                new InvoiceItem("Mouse", new BigDecimal("5"), new BigDecimal("200000"), new BigDecimal("8")),
+                new InvoiceItem("Book", new BigDecimal("10"), new BigDecimal("50000"), new BigDecimal("0"))
+        ));
+
+        assertThat(result.errors()).isEmpty();
+        
+        // Cần đảm bảo giá trị đúng và đặc biệt phần scale (số thập phân) phải bằng 0 (đã loại bỏ .00)
+        assertThat(result.totals().totalBeforeVat()).isEqualTo(new BigDecimal("31500000"));
+        assertThat(result.totals().totalBeforeVat().scale()).isLessThanOrEqualTo(0);
+        
+        assertThat(result.totals().totalVat()).isEqualTo(new BigDecimal("3080000"));
+        assertThat(result.totals().totalVat().scale()).isLessThanOrEqualTo(0);
+        
+        assertThat(result.totals().totalPayable()).isEqualTo(new BigDecimal("34580000"));
+        assertThat(result.totals().totalPayable().scale()).isLessThanOrEqualTo(0);
     }
 }

@@ -47,10 +47,16 @@ public final class Calculator {
         }
 
         if (exceedsPrecision(beforeTotal) || exceedsPrecision(vatTotal) || exceedsPrecision(afterTotal)) {
-            throw new com.company.invoice.xlsx.InvoiceException("invoice total exceeds Excel's 15 significant digit precision");
+            throw new InvoiceException("invoice total exceeds Excel's 15 significant digit precision");
         }
 
-        return new CalculationResult(lines, new InvoiceTotals(beforeTotal, vatTotal, afterTotal), errors);
+        return new CalculationResult(lines, new InvoiceTotals(stripFractionIfZero(beforeTotal), stripFractionIfZero(vatTotal), stripFractionIfZero(afterTotal)), errors);
+    }
+
+    static BigDecimal stripFractionIfZero(BigDecimal value) {
+        if (value == null) return null;
+        BigDecimal stripped = value.stripTrailingZeros();
+        return stripped.scale() <= 0 ? stripped.setScale(0) : value;
     }
 
     public static Optional<InvoiceLine> calculateSingleLine(InvoiceConfig config, InvoiceItem item, int rowNumber,
@@ -78,7 +84,7 @@ public final class Calculator {
         }
 
         return Optional.of(new InvoiceLine(0, item.itemName(), item.quantity(), item.unitPrice(), item.vatRate(),
-                before, vat, after));
+                stripFractionIfZero(before), stripFractionIfZero(vat), stripFractionIfZero(after)));
     }
 
     private static List<RowError> validateItem(InvoiceItem item, int rowNumber) {

@@ -2,6 +2,7 @@ package com.company.invoice.xlsx.batch;
 
 import java.nio.file.Path;
 import java.util.Objects;
+import com.company.invoice.xlsx.JobContext;
 
 /** 
  * One unit of work for batch processing.

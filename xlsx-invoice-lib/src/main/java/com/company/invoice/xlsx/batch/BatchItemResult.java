@@ -2,6 +2,7 @@ package com.company.invoice.xlsx.batch;
 
 import java.util.Optional;
 import com.company.invoice.xlsx.error.InvoiceException;
+import com.company.invoice.xlsx.ProcessingResult;
 
 /** 
  * Outcome of a single job within a batch. 

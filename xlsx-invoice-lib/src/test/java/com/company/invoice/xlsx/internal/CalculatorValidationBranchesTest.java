@@ -29,7 +29,7 @@ class CalculatorValidationBranchesTest {
         void acceptsInclusiveBoundariesAndValidDecimalScale() {
                 Calculator.CalculationResult result = Calculator.calculate(InvoiceConfig.builder().build(),
                                 List.of(new InvoiceItem("x".repeat(255), new BigDecimal("1.000"), BigDecimal.ZERO,
-                                                new BigDecimal("100"))), "Items");
+                                                new BigDecimal("100"))));
 
                 assertThat(result.errors()).isEmpty();
                 assertThat(result.lines()).hasSize(1);
