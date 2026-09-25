@@ -70,7 +70,7 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
                 predicates.add(cb.equal(root.get("statusColumnId"), statusColumnId));
             }
             if (assigneeId != null) {
-                predicates.add(cb.equal(root.get("assigneeId"), assigneeId));
+                predicates.add(cb.equal(cb.function("JSON_CONTAINS", Integer.class, root.get("assigneeIds"), cb.literal(assigneeId.toString())), 1));
             }
             if (priority != null) {
                 predicates.add(cb.equal(root.get("priority"), priority));
@@ -112,7 +112,7 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
             predicates.add(root.get("boardId").in(boardIds));
             predicates.add(cb.isNull(root.get("deletedAt")));
             if (assigneeId != null) {
-                predicates.add(cb.equal(root.get("assigneeId"), assigneeId));
+                predicates.add(cb.equal(cb.function("JSON_CONTAINS", Integer.class, root.get("assigneeIds"), cb.literal(assigneeId.toString())), 1));
             }
             if (from != null) {
                 predicates.add(cb.greaterThanOrEqualTo(root.get("createdAt"), from));
@@ -157,7 +157,12 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
         entity.setTitle(task.getTitle());
         entity.setDescription(task.getDescription());
         entity.setStatusColumnId(task.getStatusColumnId());
-        entity.setAssigneeId(task.getAssigneeId());
+        entity.setAssigneeIds(task.getAssigneeIds());
+        entity.setAssignedDate(task.getAssignedDate());
+        entity.setStartDate(task.getStartDate());
+        entity.setSubtasks(task.getSubtasks());
+        entity.setComments(task.getComments());
+        entity.setAttachments(task.getAttachments());
         entity.setPriority(task.getPriority());
         entity.setDueDate(task.getDueDate());
         entity.setCreatedBy(task.getCreatedBy());
@@ -179,7 +184,12 @@ public class TaskRepositoryAdapter implements TaskRepositoryPort {
                 entity.getTitle(),
                 entity.getDescription(),
                 entity.getStatusColumnId(),
-                entity.getAssigneeId(),
+                entity.getAssigneeIds(),
+                entity.getAssignedDate(),
+                entity.getStartDate(),
+                entity.getSubtasks(),
+                entity.getComments(),
+                entity.getAttachments(),
                 entity.getPriority(),
                 entity.getDueDate(),
                 entity.getCreatedBy(),

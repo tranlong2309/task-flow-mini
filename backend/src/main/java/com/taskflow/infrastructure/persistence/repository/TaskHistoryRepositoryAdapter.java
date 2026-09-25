@@ -17,7 +17,9 @@ public class TaskHistoryRepositoryAdapter implements TaskHistoryRepositoryPort {
     @Override
     public void save(TaskHistory taskHistory) {
         TaskHistoryEntity entity = new TaskHistoryEntity();
-        entity.setTaskId(taskHistory.getTaskId());
+        if (taskHistory.getTaskId() != null) {
+            entity.setTaskId(taskHistory.getTaskId().toString());
+        }
         entity.setFieldName(taskHistory.getFieldName());
         entity.setOldValue(taskHistory.getOldValue());
         entity.setNewValue(taskHistory.getNewValue());

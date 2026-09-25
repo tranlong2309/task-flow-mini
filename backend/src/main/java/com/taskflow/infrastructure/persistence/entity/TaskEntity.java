@@ -1,9 +1,19 @@
 package com.taskflow.infrastructure.persistence.entity;
 
 import com.taskflow.domain.model.Priority;
+import com.taskflow.domain.model.Subtask;
+import com.taskflow.domain.model.Comment;
+import com.taskflow.domain.model.Attachment;
 import jakarta.persistence.*;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
+
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 
 @Entity
 @Table(name = "tasks")
@@ -25,8 +35,27 @@ public class TaskEntity {
     @Column(name = "status_column_id")
     private Long statusColumnId;
 
-    @Column(name = "assignee_id")
-    private Long assigneeId;
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "assignee_ids", columnDefinition = "json")
+    private Set<Long> assigneeIds = new HashSet<>();
+
+    @Column(name = "assigned_date")
+    private Instant assignedDate;
+
+    @Column(name = "start_date")
+    private Instant startDate;
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "subtasks", columnDefinition = "json")
+    private List<Subtask> subtasks = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "comments", columnDefinition = "json")
+    private List<Comment> comments = new ArrayList<>();
+
+    @JdbcTypeCode(SqlTypes.JSON)
+    @Column(name = "attachments", columnDefinition = "json")
+    private List<Attachment> attachments = new ArrayList<>();
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false)
@@ -75,8 +104,20 @@ public class TaskEntity {
     public void setDescription(String description) { this.description = description; }
     public Long getStatusColumnId() { return statusColumnId; }
     public void setStatusColumnId(Long statusColumnId) { this.statusColumnId = statusColumnId; }
-    public Long getAssigneeId() { return assigneeId; }
-    public void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }
+    public Set<Long> getAssigneeIds() { return assigneeIds; }
+    public void setAssigneeIds(Set<Long> assigneeIds) { this.assigneeIds = assigneeIds; }
+    
+    public Instant getAssignedDate() { return assignedDate; }
+    public void setAssignedDate(Instant assignedDate) { this.assignedDate = assignedDate; }
+    public Instant getStartDate() { return startDate; }
+    public void setStartDate(Instant startDate) { this.startDate = startDate; }
+    
+    public List<Subtask> getSubtasks() { return subtasks; }
+    public void setSubtasks(List<Subtask> subtasks) { this.subtasks = subtasks; }
+    public List<Comment> getComments() { return comments; }
+    public void setComments(List<Comment> comments) { this.comments = comments; }
+    public List<Attachment> getAttachments() { return attachments; }
+    public void setAttachments(List<Attachment> attachments) { this.attachments = attachments; }
     public Priority getPriority() { return priority; }
     public void setPriority(Priority priority) { this.priority = priority; }
     public Instant getDueDate() { return dueDate; }

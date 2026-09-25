@@ -22,6 +22,7 @@ public class NotificationEntity {
     private String message;
 
     @Column(name = "related_task_id", columnDefinition = "CHAR(36)")
+    @org.hibernate.annotations.JdbcTypeCode(java.sql.Types.VARCHAR)
     private UUID relatedTaskId;
 
     @Column(name = "created_at", updatable = false)
