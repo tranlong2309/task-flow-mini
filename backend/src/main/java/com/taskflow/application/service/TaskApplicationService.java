@@ -21,8 +21,11 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.Instant;
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Set;
+import java.util.HashSet;
 
 @Service
 public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseCase, GetTaskUseCase, SearchTasksUseCase, DeleteTaskUseCase {
@@ -47,15 +50,19 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
 
     @Override
     @Transactional
-    public Task createTask(UUID boardId, String title, String description, Long assigneeId, Priority priority, Instant dueDate, Long statusColumnId, Long createdBy) {
+    public Task createTask(UUID boardId, String title, String description, Set<Long> assigneeIds, Priority priority, Instant dueDate, Long statusColumnId, Long createdBy) {
         validateTitle(title);
         
         if (dueDate == null) {
             throw new IllegalArgumentException("dueDate must not be null");
         }
 
-        if (assigneeId != null) {
-            verifyUserInBoard(boardId, assigneeId);
+        if (assigneeIds != null) {
+            for (Long assigneeId : assigneeIds) {
+                verifyUserInBoard(boardId, assigneeId);
+            }
+        } else {
+            assigneeIds = new HashSet<>();
         }
 
         BoardPermission permission = getBoardPermissionUseCase.getPermissions(boardId, createdBy);
@@ -63,9 +70,9 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
             throw new AccessDeniedException("User does not have permission to create task");
         }
 
-        Task task = new Task(UUID.randomUUID(), boardId, title, description, statusColumnId, assigneeId, priority, dueDate, createdBy, Instant.now(), Instant.now(), null, 0, null, false, null, null);
+        Task task = new Task(UUID.randomUUID(), boardId, title, description, statusColumnId, assigneeIds, null, null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), priority, dueDate, createdBy, Instant.now(), Instant.now(), null, 0, null, false, null, null);
         task = taskRepositoryPort.save(task);
-        if (task.getAssigneeId() != null) {
+        if (!task.getAssigneeIds().isEmpty()) {
             sendNotificationUseCase.sendTaskAssignedNotification(task);
         }
         return task;
@@ -73,7 +80,13 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
 
     @Override
     @Transactional
-    public Task updateTask(UUID taskId, String title, String description, Long assigneeId, Priority priority, Instant dueDate, Long statusColumnId, Long updaterId) {
+    public Task updateTask(UUID taskId, String title, String description, Set<Long> assigneeIds, 
+                           Priority priority, Instant dueDate, Long statusColumnId, 
+                           Instant assignedDate, Instant startDate, 
+                           List<com.taskflow.domain.model.Subtask> subtasks, 
+                           List<com.taskflow.domain.model.Comment> comments, 
+                           List<com.taskflow.domain.model.Attachment> attachments,
+                           Long updaterId) {
         Task task = taskRepositoryPort.findById(taskId)
                 .orElseThrow(() -> new IllegalArgumentException("Task not found: " + taskId));
         
@@ -94,10 +107,12 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
 
         boolean assigneeChanged = false;
 
-        if (assigneeId != null && !Objects.equals(task.getAssigneeId(), assigneeId)) {
-            verifyUserInBoard(task.getBoardId(), assigneeId);
-            recordHistory(taskId, "assignee_id", String.valueOf(task.getAssigneeId()), String.valueOf(assigneeId), updaterId);
-            task.setAssigneeId(assigneeId);
+        if (assigneeIds != null && !Objects.equals(task.getAssigneeIds(), assigneeIds)) {
+            for (Long assigneeId : assigneeIds) {
+                verifyUserInBoard(task.getBoardId(), assigneeId);
+            }
+            recordHistory(taskId, "assignee_ids", String.valueOf(task.getAssigneeIds()), String.valueOf(assigneeIds), updaterId);
+            task.setAssigneeIds(assigneeIds);
             assigneeChanged = true;
         }
 
@@ -112,6 +127,26 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
 
         if (dueDate != null) {
             task.setDueDate(dueDate);
+        }
+        
+        if (assignedDate != null) {
+            task.setAssignedDate(assignedDate);
+        }
+        
+        if (startDate != null) {
+            task.setStartDate(startDate);
+        }
+
+        if (subtasks != null) {
+            task.setSubtasks(subtasks);
+        }
+
+        if (comments != null) {
+            task.setComments(comments);
+        }
+
+        if (attachments != null) {
+            task.setAttachments(attachments);
         }
         
         task.setUpdatedAt(Instant.now());
@@ -177,7 +212,7 @@ public class TaskApplicationService implements CreateTaskUseCase, UpdateTaskUseC
     }
 
     private void verifyCanUpdateTask(Task task, Long userId) {
-        if (Objects.equals(task.getAssigneeId(), userId)) {
+        if (task.getAssigneeIds() != null && task.getAssigneeIds().contains(userId)) {
             return;
         }
 

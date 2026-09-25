@@ -39,8 +39,8 @@ public class SendNotificationApplicationService implements SendNotificationUseCa
         notification = notificationRepositoryPort.saveNotification(notification);
 
         Set<Long> receivers = new HashSet<>(boardMemberRepositoryPort.findManagers(task.getBoardId()));
-        if (task.getAssigneeId() != null) {
-            receivers.add(task.getAssigneeId());
+        if (task.getAssigneeIds() != null) {
+            receivers.addAll(task.getAssigneeIds());
         }
 
         saveReceivers(notification.getId(), receivers);
@@ -58,8 +58,8 @@ public class SendNotificationApplicationService implements SendNotificationUseCa
         notification = notificationRepositoryPort.saveNotification(notification);
 
         Set<Long> receivers = new HashSet<>(boardMemberRepositoryPort.findManagers(task.getBoardId()));
-        if (task.getAssigneeId() != null) {
-            receivers.add(task.getAssigneeId());
+        if (task.getAssigneeIds() != null) {
+            receivers.addAll(task.getAssigneeIds());
         }
 
         saveReceivers(notification.getId(), receivers);
@@ -77,8 +77,8 @@ public class SendNotificationApplicationService implements SendNotificationUseCa
         notification = notificationRepositoryPort.saveNotification(notification);
 
         Set<Long> receivers = new HashSet<>(boardMemberRepositoryPort.findManagers(task.getBoardId()));
-        if (task.getAssigneeId() != null) {
-            receivers.add(task.getAssigneeId());
+        if (task.getAssigneeIds() != null) {
+            receivers.addAll(task.getAssigneeIds());
         }
 
         saveReceivers(notification.getId(), receivers);

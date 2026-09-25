@@ -187,7 +187,7 @@ public class TaskStatusApplicationService implements UpdateTaskStatusUseCase, Mo
             throw new IllegalArgumentException("Cannot modify a deleted task");
         }
 
-        if (!Objects.equals(task.getAssigneeId(), userId)) {
+        if (task.getAssigneeIds() == null || !task.getAssigneeIds().contains(userId)) {
             BoardPermission permission = getBoardPermissionUseCase.getPermissions(task.getBoardId(), userId);
             if (!permission.isCanEditTask()) {
                 throw new AccessDeniedException("User does not have permission to edit task");

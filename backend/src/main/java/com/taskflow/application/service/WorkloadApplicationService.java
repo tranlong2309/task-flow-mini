@@ -41,7 +41,7 @@ public class WorkloadApplicationService implements GetWorkloadUseCase {
         
         if (!isManagerOrAdmin) {
             tasks = tasks.stream()
-                    .filter(t -> Objects.equals(t.getAssigneeId(), userId))
+                    .filter(t -> t.getAssigneeIds() != null && t.getAssigneeIds().contains(userId))
                     .collect(Collectors.toList());
         }
 
@@ -72,9 +72,14 @@ public class WorkloadApplicationService implements GetWorkloadUseCase {
         summary.put("blocked", blockedCount);
 
         // Group by assignee
-        Map<Long, List<Task>> tasksByAssignee = tasks.stream()
-                .filter(t -> t.getAssigneeId() != null)
-                .collect(Collectors.groupingBy(Task::getAssigneeId));
+        Map<Long, List<Task>> tasksByAssignee = new HashMap<>();
+        for (Task t : tasks) {
+            if (t.getAssigneeIds() != null) {
+                for (Long assigneeId : t.getAssigneeIds()) {
+                    tasksByAssignee.computeIfAbsent(assigneeId, k -> new ArrayList<>()).add(t);
+                }
+            }
+        }
 
         List<Long> assigneeIds = new ArrayList<>(tasksByAssignee.keySet());
         Map<Long, String> userNames = userRepositoryPort.findByIds(assigneeIds).stream()
