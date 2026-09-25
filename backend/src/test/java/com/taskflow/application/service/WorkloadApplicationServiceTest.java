@@ -58,8 +58,8 @@ class WorkloadApplicationServiceTest {
         when(getBoardPermissionUseCase.getPermissions(boardId, userId))
                 .thenReturn(new BoardPermission(true, true, true, true)); // Admin
 
-        BoardColumn col1 = new BoardColumn(1L, boardId, "Todo", 0);
-        BoardColumn col2 = new BoardColumn(2L, boardId, "Done", 1);
+        BoardColumn col1 = new BoardColumn(1L, boardId, "Todo", 0, "gray");
+        BoardColumn col2 = new BoardColumn(2L, boardId, "Done", 1, "gray");
         when(boardColumnRepositoryPort.findByBoardId(boardId)).thenReturn(List.of(col1, col2));
 
         Instant past = Instant.now().minus(1, ChronoUnit.DAYS);

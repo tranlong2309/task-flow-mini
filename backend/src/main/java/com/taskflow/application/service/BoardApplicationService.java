@@ -15,14 +15,18 @@ public class BoardApplicationService implements CreateBoardUseCase, com.taskflow
 
     private final BoardRepositoryPort boardRepositoryPort;
     private final BoardColumnRepositoryPort boardColumnRepositoryPort;
+    private final com.taskflow.domain.repository.BoardMemberRepositoryPort boardMemberRepositoryPort;
 
-    public BoardApplicationService(BoardRepositoryPort boardRepositoryPort, BoardColumnRepositoryPort boardColumnRepositoryPort) {
+    public BoardApplicationService(BoardRepositoryPort boardRepositoryPort, 
+                                   BoardColumnRepositoryPort boardColumnRepositoryPort,
+                                   com.taskflow.domain.repository.BoardMemberRepositoryPort boardMemberRepositoryPort) {
         this.boardRepositoryPort = boardRepositoryPort;
         this.boardColumnRepositoryPort = boardColumnRepositoryPort;
+        this.boardMemberRepositoryPort = boardMemberRepositoryPort;
     }
 
     @Override
-    public Board createBoard(String name, String description, Long teamId) {
+    public Board createBoard(String name, String description, Long teamId, Long creatorId) {
         if (name == null || name.isBlank()) {
             throw new IllegalArgumentException("Board name is required");
         }
@@ -31,7 +35,11 @@ public class BoardApplicationService implements CreateBoardUseCase, com.taskflow
         }
 
         Board board = new Board(UUID.randomUUID(), name, description, teamId);
-        return boardRepositoryPort.save(board);
+        board = boardRepositoryPort.save(board);
+        
+        boardMemberRepositoryPort.save(board.getId(), creatorId, "MANAGER");
+        
+        return board;
     }
 
     @Override

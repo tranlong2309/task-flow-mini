@@ -28,4 +28,10 @@ public class BoardMemberRepositoryAdapter implements BoardMemberRepositoryPort {
                 .map(BoardMemberEntity::getUserId)
                 .collect(java.util.stream.Collectors.toList());
     }
+
+    @Override
+    public void save(UUID boardId, Long userId, String roleName) {
+        BoardMemberEntity entity = new BoardMemberEntity(boardId, userId, roleName);
+        springDataBoardMemberRepository.save(entity);
+    }
 }

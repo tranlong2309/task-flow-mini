@@ -37,12 +37,13 @@ public class BoardController {
     }
 
     @PostMapping("/boards")
-    public ResponseEntity<?> createBoard(@RequestBody Map<String, Object> payload) {
+    public ResponseEntity<?> createBoard(@RequestBody Map<String, Object> payload,
+                                         @org.springframework.security.core.annotation.AuthenticationPrincipal com.taskflow.infrastructure.security.CustomUserDetails userDetails) {
         String name = payload.get("name") != null ? payload.get("name").toString() : null;
         String description = payload.get("description") != null ? payload.get("description").toString() : "";
         Long teamId = payload.get("teamId") != null ? Long.valueOf(payload.get("teamId").toString()) : null;
 
-        Board board = createBoardUseCase.createBoard(name, description, teamId);
+        Board board = createBoardUseCase.createBoard(name, description, teamId, userDetails.getId());
         return ResponseEntity.status(HttpStatus.CREATED).body(Map.of(
                 "id", board.getId(),
                 "name", board.getName(),

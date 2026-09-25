@@ -21,6 +21,12 @@ public class BoardMemberEntity {
     private String roleName;
 
     public BoardMemberEntity() {}
+    
+    public BoardMemberEntity(UUID boardId, Long userId, String roleName) {
+        this.boardId = boardId;
+        this.userId = userId;
+        this.roleName = roleName;
+    }
 
     public UUID getBoardId() { return boardId; }
     public void setBoardId(UUID boardId) { this.boardId = boardId; }

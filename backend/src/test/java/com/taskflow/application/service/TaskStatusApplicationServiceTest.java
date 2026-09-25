@@ -51,7 +51,7 @@ class TaskStatusApplicationServiceTest {
         Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
         Task otherTask = new Task(UUID.randomUUID(), boardId, "Title2", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 1, null, false, null, null);
 
-        BoardColumn col = new BoardColumn(1L, boardId, "Todo", 0);
+        BoardColumn col = new BoardColumn(1L, boardId, "Todo", 0, "gray");
 
         List<Task> tasks = new ArrayList<>();
         tasks.add(existingTask);
@@ -76,8 +76,8 @@ class TaskStatusApplicationServiceTest {
         UUID boardId = UUID.randomUUID();
         Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
 
-        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
-        BoardColumn tgtCol = new BoardColumn(2L, boardId, "Done", 1);
+        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0, "gray");
+        BoardColumn tgtCol = new BoardColumn(2L, boardId, "Done", 1, "gray");
 
         List<Task> srcTasks = new ArrayList<>();
         srcTasks.add(existingTask);
@@ -103,7 +103,7 @@ class TaskStatusApplicationServiceTest {
         UUID boardId = UUID.randomUUID();
         Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
 
-        BoardColumn tgtCol = new BoardColumn(2L, UUID.randomUUID(), "Done", 1); // Different boardId
+        BoardColumn tgtCol = new BoardColumn(2L, UUID.randomUUID(), "Done", 1, "gray"); // Different boardId
 
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(boardColumnRepositoryPort.findById(2L)).thenReturn(Optional.of(tgtCol));
@@ -127,7 +127,7 @@ class TaskStatusApplicationServiceTest {
         UUID boardId = UUID.randomUUID();
         Task existingTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, false, null, null);
 
-        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
+        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0, "gray");
 
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(boardColumnRepositoryPort.findById(1L)).thenReturn(Optional.of(srcCol));
@@ -146,7 +146,7 @@ class TaskStatusApplicationServiceTest {
         UUID boardId = UUID.randomUUID();
         Task blockedTask = new Task(taskId, boardId, "Title", "Desc", 1L, 2L, Priority.HIGH, Instant.now(), 1L, Instant.now(), Instant.now(), null, 0, null, true, "Reason", Instant.now());
 
-        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0);
+        BoardColumn srcCol = new BoardColumn(1L, boardId, "Todo", 0, "gray");
 
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(blockedTask));
         when(boardColumnRepositoryPort.findById(1L)).thenReturn(Optional.of(srcCol));
