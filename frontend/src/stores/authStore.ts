@@ -37,4 +37,13 @@ export const can = (role: Role | undefined, permission: 'manageBoard' | 'editTas
   return permission === 'createTask' || permission === 'editTicket'
 }
 
-export const canEditTask = (user: User | null, task: Task) => Boolean(user && (user.role === 'ADMIN' || user.role === 'MANAGER' || task.assigneeId === user.id))
+export const canEditTask = (user: User | null, task: Task) => {
+  if (!user) return false;
+  if (user.role === 'ADMIN' || user.role === 'MANAGER') return true;
+  
+  const userIdStr = String(user.id);
+  if (task.assigneeIds && task.assigneeIds.some(id => String(id) === userIdStr)) return true;
+  if (task.assigneeId && String(task.assigneeId) === userIdStr) return true;
+  
+  return false;
+}

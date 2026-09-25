@@ -1,6 +1,6 @@
 import type { Board, BoardColumn, Notification, Project, Session, Task, Ticket, User } from '../../types/domain'
 
-export type CreateTaskInput = Pick<Task, 'title' | 'description' | 'assigneeId' | 'priority' | 'dueDate' | 'projectId' | 'boardId' | 'statusColumnId'>
+export type CreateTaskInput = Pick<Task, 'title' | 'description' | 'assigneeId' | 'assigneeIds' | 'priority' | 'dueDate' | 'projectId' | 'boardId' | 'statusColumnId' | 'assignedDate' | 'startDate' | 'comments' | 'subtasks' | 'attachments'>
 export type UpdateTaskInput = Partial<Omit<CreateTaskInput, 'projectId' | 'boardId'>>
 export type CreateTicketInput = Omit<Ticket, 'id' | 'updatedAt'>
 export type UpdateTicketInput = Partial<Omit<Ticket, 'id' | 'taskId'>>
@@ -9,6 +9,7 @@ export interface TaskFilters {
   search?: string;
   assigneeId?: string | number;
   priority?: string;
+  overdueOnly?: boolean;
   assignedDateFrom?: string;
   assignedDateTo?: string;
   startDateFrom?: string;

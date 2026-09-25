@@ -25,6 +25,28 @@ export interface BoardColumn {
   tone: string
 }
 
+export interface Subtask {
+  id: string
+  title: string
+  isCompleted: boolean
+  createdAt: string
+}
+
+export interface Comment {
+  id: string
+  userId: string | number
+  content: string
+  createdAt: string
+}
+
+export interface Attachment {
+  id: string
+  fileName: string
+  fileUrl: string
+  uploadedBy: string | number
+  createdAt: string
+}
+
 export interface Task {
   id: string | number
   projectId?: string | number
@@ -35,6 +57,12 @@ export interface Task {
   columnId?: string | number
   statusColumnId?: string | number
   assigneeId?: string | number | null
+  assigneeIds?: (string | number)[]
+  assignedDate?: string | null
+  startDate?: string | null
+  subtasks?: Subtask[]
+  comments?: Comment[]
+  attachments?: Attachment[]
   priority: Priority
   dueDate: string
   tags: string[]
