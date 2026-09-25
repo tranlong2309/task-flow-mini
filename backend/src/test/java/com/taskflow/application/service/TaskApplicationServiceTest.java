@@ -67,7 +67,7 @@ class TaskApplicationServiceTest {
         when(getBoardPermissionUseCase.getPermissions(boardId, 3L)).thenReturn(new BoardPermission(true, false, false, false)); // No edit permission
 
         assertThrows(AccessDeniedException.class, () -> {
-            taskApplicationService.updateTask(taskId, "New Title", null, null, null, null, null, 3L);
+            taskApplicationService.updateTask(taskId, "New Title", null, null, null, null, null, null, null, null, null, null, 3L);
         });
     }
 
@@ -80,7 +80,7 @@ class TaskApplicationServiceTest {
         when(taskRepositoryPort.findById(taskId)).thenReturn(Optional.of(existingTask));
         when(taskRepositoryPort.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
-        Task updatedTask = taskApplicationService.updateTask(taskId, "New Title", null, null, null, null, null, 2L);
+        Task updatedTask = taskApplicationService.updateTask(taskId, "New Title", null, null, null, null, null, null, null, null, null, null, 2L);
         
         assertEquals("New Title", updatedTask.getTitle());
         verify(getBoardPermissionUseCase, never()).getPermissions(any(), any()); // Assignee bypasses board permission check
@@ -97,13 +97,13 @@ class TaskApplicationServiceTest {
         when(boardMemberRepositoryPort.getRoleInBoard(boardId, 4L)).thenReturn(Optional.of("MEMBER"));
         when(taskRepositoryPort.save(any(Task.class))).thenAnswer(i -> i.getArgument(0));
 
-        taskApplicationService.updateTask(taskId, null, null, 4L, null, null, null, 3L);
+        taskApplicationService.updateTask(taskId, null, null, new java.util.HashSet<>(java.util.List.of(4L)), null, null, null, null, null, null, null, null, 3L);
         
         verify(taskHistoryRepositoryPort).save(argThat(history -> 
             history.getTaskId().equals(taskId) && 
-            "assignee_id".equals(history.getFieldName()) && 
-            "2".equals(history.getOldValue()) && 
-            "4".equals(history.getNewValue()) && 
+            "assignee_ids".equals(history.getFieldName()) && 
+            "[2]".equals(history.getOldValue()) && 
+            "[4]".equals(history.getNewValue()) && 
             history.getChangedBy().equals(3L)
         ));
     }

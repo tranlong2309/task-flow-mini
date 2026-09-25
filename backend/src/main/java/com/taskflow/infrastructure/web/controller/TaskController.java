@@ -21,6 +21,7 @@ import java.time.Instant;
 import java.util.Map;
 import java.util.UUID;
 import java.util.List;
+import java.util.Set;
 
 @RestController
 @RequestMapping("/api/v1")
@@ -66,12 +67,22 @@ public class TaskController {
             UUID boardId = UUID.fromString(payload.get("boardId").toString());
             String title = (String) payload.get("title");
             String description = (String) payload.get("description");
-            Long assigneeId = payload.get("assigneeId") != null ? Long.valueOf(payload.get("assigneeId").toString()) : null;
+            
+            Set<Long> assigneeIds = new java.util.HashSet<>();
+            if (payload.get("assigneeIds") != null) {
+                List<?> list = (List<?>) payload.get("assigneeIds");
+                for (Object o : list) {
+                    assigneeIds.add(Long.valueOf(o.toString()));
+                }
+            } else if (payload.get("assigneeId") != null) {
+                assigneeIds.add(Long.valueOf(payload.get("assigneeId").toString()));
+            }
+
             Priority priority = Priority.valueOf((String) payload.get("priority"));
             Instant dueDate = payload.get("dueDate") != null ? Instant.parse(payload.get("dueDate").toString()) : null;
             Long statusColumnId = payload.get("statusColumnId") != null ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
 
-            Task task = createTaskUseCase.createTask(boardId, title, description, assigneeId, priority, dueDate, statusColumnId, userDetails.getId());
+            Task task = createTaskUseCase.createTask(boardId, title, description, assigneeIds, priority, dueDate, statusColumnId, userDetails.getId());
             return ResponseEntity.status(HttpStatus.CREATED).body(task);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
@@ -85,15 +96,50 @@ public class TaskController {
         try {
             String title = payload.containsKey("title") ? (String) payload.get("title") : null;
             String description = payload.containsKey("description") ? (String) payload.get("description") : null;
-            Long assigneeId = payload.containsKey("assigneeId") && payload.get("assigneeId") != null ? Long.valueOf(payload.get("assigneeId").toString()) : null;
+            
+            Set<Long> assigneeIds = null;
+            if (payload.containsKey("assigneeIds") && payload.get("assigneeIds") != null) {
+                assigneeIds = new java.util.HashSet<>();
+                List<?> list = (List<?>) payload.get("assigneeIds");
+                for (Object o : list) {
+                    assigneeIds.add(Long.valueOf(o.toString()));
+                }
+            } else if (payload.containsKey("assigneeId") && payload.get("assigneeId") != null) {
+                assigneeIds = new java.util.HashSet<>();
+                assigneeIds.add(Long.valueOf(payload.get("assigneeId").toString()));
+            }
+
             Priority priority = payload.containsKey("priority") ? Priority.valueOf((String) payload.get("priority")) : null;
             Instant dueDate = payload.containsKey("dueDate") && payload.get("dueDate") != null ? Instant.parse(payload.get("dueDate").toString()) : null;
+            Instant assignedDate = payload.containsKey("assignedDate") && payload.get("assignedDate") != null ? Instant.parse(payload.get("assignedDate").toString()) : null;
+            Instant startDate = payload.containsKey("startDate") && payload.get("startDate") != null ? Instant.parse(payload.get("startDate").toString()) : null;
             Long statusColumnId = payload.containsKey("statusColumnId") && payload.get("statusColumnId") != null ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
+            
+            com.fasterxml.jackson.databind.ObjectMapper mapper = new com.fasterxml.jackson.databind.ObjectMapper();
+            mapper.registerModule(new com.fasterxml.jackson.datatype.jsr310.JavaTimeModule());
+            
+            List<com.taskflow.domain.model.Subtask> subtasks = null;
+            if (payload.containsKey("subtasks") && payload.get("subtasks") != null) {
+                subtasks = mapper.convertValue(payload.get("subtasks"), new com.fasterxml.jackson.core.type.TypeReference<List<com.taskflow.domain.model.Subtask>>() {});
+            }
+            
+            List<com.taskflow.domain.model.Comment> comments = null;
+            if (payload.containsKey("comments") && payload.get("comments") != null) {
+                comments = mapper.convertValue(payload.get("comments"), new com.fasterxml.jackson.core.type.TypeReference<List<com.taskflow.domain.model.Comment>>() {});
+            }
+            
+            List<com.taskflow.domain.model.Attachment> attachments = null;
+            if (payload.containsKey("attachments") && payload.get("attachments") != null) {
+                attachments = mapper.convertValue(payload.get("attachments"), new com.fasterxml.jackson.core.type.TypeReference<List<com.taskflow.domain.model.Attachment>>() {});
+            }
 
-            Task task = updateTaskUseCase.updateTask(taskId, title, description, assigneeId, priority, dueDate, statusColumnId, userDetails.getId());
+            Task task = updateTaskUseCase.updateTask(taskId, title, description, assigneeIds, priority, dueDate, statusColumnId, assignedDate, startDate, subtasks, comments, attachments, userDetails.getId());
             return ResponseEntity.ok(task);
         } catch (IllegalArgumentException e) {
             return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+        } catch (Exception e) {
+            e.printStackTrace();
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(Map.of("error", e.getClass().getName() + ": " + e.getMessage()));
         }
     }
 
@@ -172,16 +218,17 @@ public class TaskController {
                 assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
                 userDetails.getId(), page, size);
             
-            List<com.taskflow.domain.model.TaskSearchResult> items = paged.content().stream().map(t -> 
-                new com.taskflow.domain.model.TaskSearchResult(
+            List<com.taskflow.domain.model.TaskSearchResult> items = paged.content().stream().map(t -> {
+                Long primaryAssignee = (t.getAssigneeIds() != null && !t.getAssigneeIds().isEmpty()) ? t.getAssigneeIds().iterator().next() : null;
+                return new com.taskflow.domain.model.TaskSearchResult(
                     t.getId(), 
                     t.getTitle(), 
                     colMap.getOrDefault(t.getStatusColumnId(), "UNKNOWN"), 
-                    t.getAssigneeId(), 
+                    primaryAssignee, 
                     t.getPriority(), 
                     t.getDueDate()
-                )
-            ).collect(java.util.stream.Collectors.toList());
+                );
+            }).collect(java.util.stream.Collectors.toList());
 
             return ResponseEntity.ok(Map.of(
                 "items", items,

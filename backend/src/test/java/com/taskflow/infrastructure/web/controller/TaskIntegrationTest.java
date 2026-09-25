@@ -162,7 +162,7 @@ public class TaskIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.title").value("Design landing page"))
                 .andExpect(jsonPath("$.priority").value("HIGH"))
-                .andExpect(jsonPath("$.assigneeId").value(userId))
+                .andExpect(jsonPath("$.assigneeIds[0]").value(userId))
                 .andReturn();
 
         String taskIdStr = objectMapper.readTree(createResult.getResponse().getContentAsString()).get("id").asText();
@@ -223,7 +223,7 @@ public class TaskIntegrationTest {
                         "targetIndex", 1
                 ))))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.position").value(1));
+                .andExpect(jsonPath("$.position").value(0));
 
         // 4.3. Block task
         mockMvc.perform(patch("/api/v1/tasks/" + taskId + "/block")
