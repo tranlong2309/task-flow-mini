@@ -14,7 +14,9 @@ import com.taskflow.domain.model.Priority;
 import com.taskflow.domain.model.Task;
 import com.taskflow.infrastructure.security.CustomUserDetails;
 import com.taskflow.infrastructure.web.dto.ProblemDetail;
+import com.taskflow.infrastructure.web.dto.PagedWorkOrderResponse;
 import com.taskflow.infrastructure.web.dto.WorkOrderResponse;
+import com.taskflow.infrastructure.web.dto.WorkOrderSummary;
 import jakarta.servlet.http.HttpServletRequest;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -214,28 +216,57 @@ public class TaskController {
         }
     }
 
+    // ─── GET /api/v1/work-orders ──────────────────────────────────────────────────
+    // Spec: docs/api-spec.yaml → GET /work-orders (liệt kê danh sách task trong board)
     @GetMapping("/boards/{boardId}/tasks")
     public ResponseEntity<?> searchTasks(@PathVariable UUID boardId,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Long statusColumnId,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Long assigneeId,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean overdueOnly,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateFrom,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateTo,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateFrom,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateTo,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateFrom,
-                                           @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateTo,
-                                           @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
-                                           @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
-                                           @AuthenticationPrincipal CustomUserDetails userDetails) {
-        if (size > 100) size = 100;
-        com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(
-            boardId, statusColumnId, assigneeId, priority, search, overdueOnly, 
-            assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
-            userDetails.getId(), page, size);
-        return ResponseEntity.ok(paged);
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) Long statusColumnId,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) Long assigneeId,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) Priority priority,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) String search,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) Boolean overdueOnly,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateFrom,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant assignedDateTo,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateFrom,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant startDateTo,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateFrom,
+                                         @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateTo,
+                                         @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
+                                         @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
+                                         @AuthenticationPrincipal CustomUserDetails userDetails,
+                                         HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
+        try {
+            if (size > 100) size = 100;
+            if (search != null && search.length() > 100) {
+                return ResponseEntity.badRequest()
+                        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body(ProblemDetail.badRequest("Query string cannot exceed 100 characters", requestUri));
+            }
+
+            com.taskflow.infrastructure.web.dto.PagedResponse<Task> paged = searchTasksUseCase.searchTasks(
+                boardId, statusColumnId, assigneeId, priority, search, overdueOnly, 
+                assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
+                userDetails.getId(), page, size);
+
+            Map<Long, String> colMap = boardColumnRepositoryPort.findByBoardId(boardId)
+                    .stream()
+                    .collect(java.util.stream.Collectors.toMap(BoardColumn::getId, BoardColumn::getName));
+
+            List<WorkOrderSummary> mappedItems = paged.content().stream()
+                    .map(t -> WorkOrderSummary.from(t, colMap.getOrDefault(t.getStatusColumnId(), "UNKNOWN")))
+                    .toList();
+
+            return ResponseEntity.ok(PagedWorkOrderResponse.from(paged, mappedItems));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
+        } catch (IllegalArgumentException e) {
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
+        }
     }
 
     @GetMapping("/boards/{boardId}/tasks/search")
@@ -252,24 +283,27 @@ public class TaskController {
                                                  @org.springframework.web.bind.annotation.RequestParam(required = false) @org.springframework.format.annotation.DateTimeFormat(iso = org.springframework.format.annotation.DateTimeFormat.ISO.DATE_TIME) Instant endDateTo,
                                                  @org.springframework.web.bind.annotation.RequestParam(defaultValue = "0") int page,
                                                  @org.springframework.web.bind.annotation.RequestParam(defaultValue = "20") int size,
-                                                 @AuthenticationPrincipal CustomUserDetails userDetails) {
-        
+                                                 @AuthenticationPrincipal CustomUserDetails userDetails,
+                                                 HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         if (q != null && q.length() > 100) {
-            return ResponseEntity.badRequest().body(Map.of("error", "Query string cannot exceed 100 characters"));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest("Query string cannot exceed 100 characters", requestUri));
         }
 
+        List<BoardColumn> columns = boardColumnRepositoryPort.findByBoardId(boardId);
         Long statusColumnId = null;
-        List<com.taskflow.domain.model.BoardColumn> columns = boardColumnRepositoryPort.findByBoardId(boardId);
-        
         if (status != null) {
             statusColumnId = columns.stream()
                     .filter(c -> c.getName().equalsIgnoreCase(status))
-                    .map(com.taskflow.domain.model.BoardColumn::getId)
+                    .map(BoardColumn::getId)
                     .findFirst()
-                    .orElse(-1L); // Not found -> non-existent column to return empty
+                    .orElse(-1L);
         }
 
-        Map<Long, String> colMap = columns.stream().collect(java.util.stream.Collectors.toMap(com.taskflow.domain.model.BoardColumn::getId, com.taskflow.domain.model.BoardColumn::getName));
+        Map<Long, String> colMap = columns.stream()
+                .collect(java.util.stream.Collectors.toMap(BoardColumn::getId, BoardColumn::getName));
 
         try {
             if (size > 100) size = 100;
@@ -278,29 +312,19 @@ public class TaskController {
                 assignedDateFrom, assignedDateTo, startDateFrom, startDateTo, endDateFrom, endDateTo,
                 userDetails.getId(), page, size);
             
-            List<com.taskflow.domain.model.TaskSearchResult> items = paged.content().stream().map(t -> {
-                Long primaryAssignee = (t.getAssigneeIds() != null && !t.getAssigneeIds().isEmpty()) ? t.getAssigneeIds().iterator().next() : null;
-                return new com.taskflow.domain.model.TaskSearchResult(
-                    t.getId(), 
-                    t.getTitle(), 
-                    colMap.getOrDefault(t.getStatusColumnId(), "UNKNOWN"), 
-                    primaryAssignee, 
-                    t.getPriority(), 
-                    t.getDueDate()
-                );
-            }).collect(java.util.stream.Collectors.toList());
+            List<WorkOrderSummary> mappedItems = paged.content().stream()
+                    .map(t -> WorkOrderSummary.from(t, colMap.getOrDefault(t.getStatusColumnId(), "UNKNOWN")))
+                    .toList();
 
-            return ResponseEntity.ok(Map.of(
-                "items", items,
-                "totalElements", paged.totalElements(),
-                "totalPages", paged.totalPages(),
-                "page", paged.page(),
-                "size", paged.size()
-            ));
-        } catch (org.springframework.security.access.AccessDeniedException e) {
-            return ResponseEntity.status(403).build();
+            return ResponseEntity.ok(PagedWorkOrderResponse.from(paged, mappedItems));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
         }
     }
     
