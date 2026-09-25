@@ -1,0 +1,799 @@
+openapi: "3.1.0"
+
+info:
+  title: Task Flow Mini — Work Order API
+  version: "1.0.0"
+  description: |
+    **Section 5 – Day 3 | Spec-Driven Design (SDD)**
+
+    OpenAPI Specification cho 3 endpoint cốt lõi của Work Order (Task) trong hệ thống Task Flow Mini.
+
+    ## Phạm vi tài liệu này
+    - `POST /api/v1/work-orders` — Tạo Work Order mới
+    - `GET  /api/v1/work-orders/{id}` — Lấy chi tiết Work Order theo ID
+    - `GET  /api/v1/work-orders` — Liệt kê và lọc Work Order theo trạng thái
+
+    ## Quy ước chung
+    - Base path: `/api/v1`
+    - Authentication: JWT Bearer token (Header: `Authorization: Bearer <token>`)
+    - Tất cả timestamp lưu UTC, format ISO-8601 (ví dụ: `2026-09-30T17:00:00Z`)
+    - Lỗi trả về theo chuẩn **RFC 7807 Problem Details**
+    - Danh sách task phải được đặt trong response object có pagination; không trả raw list
+
+  contact:
+    name: Task Flow Mini Team
+  license:
+    name: Internal — Not for public use
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development server
+  - url: https://taskflow.internal/api/v1
+    description: Staging server
+
+tags:
+  - name: work-orders
+    description: |
+      Quản lý vòng đời Work Order (Task) — tạo, xem chi tiết, và lọc theo trạng thái.
+
+# ─────────────────────────────────────────────────────────────────────────────
+# PATHS
+# ─────────────────────────────────────────────────────────────────────────────
+paths:
+
+  # ───────────────────────────────────────────
+  # Endpoint 1: POST /api/v1/work-orders
+  # ───────────────────────────────────────────
+  /work-orders:
+    post:
+      tags:
+        - work-orders
+      operationId: createWorkOrder
+      summary: Tạo Work Order mới
+      description: |
+        Tạo một Work Order (Task) mới trong một Board cụ thể.
+
+        **Business Rules:**
+        - `title` bắt buộc, không blank, tối đa 255 ký tự.
+        - `assigneeId` phải là thành viên hợp lệ của board được khai báo bởi `boardId`.
+        - `statusColumnId` phải thuộc cùng board.
+        - `dueDate` bắt buộc ở MVP; phải là thời điểm trong tương lai.
+        - `priority` bắt buộc; chấp nhận `LOW`, `MEDIUM`, `HIGH`.
+        - `createdBy` được lấy tự động từ JWT token; client không được truyền trường này.
+        - Sau khi tạo thành công, server phát ra Domain Event `WorkOrderCreated`.
+
+        **Quyền truy cập:** `MEMBER`, `MANAGER`, `ADMIN` (phải là thành viên của board).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateWorkOrderRequest'
+            example:
+              boardId: 101
+              title: "Design landing page hero section"
+              description: "Thiết kế hero section và CTA button theo brand guideline Q4 2026"
+              assigneeId: 7
+              priority: "HIGH"
+              dueDate: "2026-09-30T17:00:00Z"
+              statusColumnId: 1
+      responses:
+        "201":
+          description: Work Order được tạo thành công.
+          headers:
+            Location:
+              description: URI của Work Order vừa tạo.
+              schema:
+                type: string
+                example: /api/v1/work-orders/5001
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrderResponse'
+              example:
+                id: 5001
+                boardId: 101
+                title: "Design landing page hero section"
+                description: "Thiết kế hero section và CTA button theo brand guideline Q4 2026"
+                status: "TODO"
+                statusColumnId: 1
+                statusColumnName: "Todo"
+                priority: "HIGH"
+                dueDate: "2026-09-30T17:00:00Z"
+                assigneeId: 7
+                assigneeName: "Lan Nguyen"
+                isBlocked: false
+                blockedReason: null
+                completedAt: null
+                createdBy: 5
+                createdAt: "2026-09-25T08:30:00Z"
+                updatedAt: "2026-09-25T08:30:00Z"
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "422":
+          description: |
+            Unprocessable Entity — dữ liệu hợp lệ về cú pháp nhưng vi phạm business rule
+            (ví dụ: `assigneeId` không thuộc board, `statusColumnId` thuộc board khác,
+            `dueDate` trong quá khứ).
+          content:
+            application/problem+json:
+              schema:
+                $ref: '#/components/schemas/ProblemDetail'
+              example:
+                type: "https://taskflow.internal/problems/business-rule-violation"
+                title: "Business Rule Violation"
+                status: 422
+                detail: "assigneeId 7 is not a member of board 101"
+                instance: "/api/v1/work-orders"
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+    # ───────────────────────────────────────────
+    # Endpoint 3: GET /api/v1/work-orders
+    # ───────────────────────────────────────────
+    get:
+      tags:
+        - work-orders
+      operationId: listWorkOrders
+      summary: Liệt kê và lọc Work Order theo trạng thái
+      description: |
+        Trả về danh sách Work Order thuộc một board, hỗ trợ lọc theo trạng thái và
+        các tiêu chí khác. Kết quả được phân trang (offset pagination).
+
+        **Business Rules:**
+        - Bắt buộc phải truyền `boardId`; user phải là thành viên của board đó.
+        - `MEMBER` chỉ xem được task của board mình thuộc về; không lọc task của board khác.
+        - Kết quả không bao giờ trả raw list; luôn bọc trong `PagedResult<WorkOrderSummary>`.
+        - Filter `overdueOnly=true` trả task chưa Done và `dueDate < now()`.
+        - Tham số `q` tìm theo title/description, tối đa 100 ký tự; dùng parameter binding — tuyệt đối không nối chuỗi SQL.
+        - Mặc định sắp xếp theo `position ASC` trong column, sau đó `createdAt DESC`.
+
+        **Quyền truy cập:** `MEMBER`, `MANAGER`, `ADMIN` (phải là thành viên của board).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: boardId
+          in: query
+          required: true
+          description: ID của board cần lấy Work Order.
+          schema:
+            type: integer
+            format: int64
+            example: 101
+
+        - name: status
+          in: query
+          required: false
+          description: Lọc theo trạng thái Work Order. Truyền nhiều giá trị bằng dấu phẩy.
+          schema:
+            type: string
+            enum: [TODO, IN_PROGRESS, REVIEW, DONE, BLOCKED]
+            example: "IN_PROGRESS"
+
+        - name: statusColumnId
+          in: query
+          required: false
+          description: Lọc theo ID cột cụ thể trong board.
+          schema:
+            type: integer
+            format: int64
+            example: 2
+
+        - name: assigneeId
+          in: query
+          required: false
+          description: Lọc Work Order được giao cho user cụ thể.
+          schema:
+            type: integer
+            format: int64
+            example: 7
+
+        - name: priority
+          in: query
+          required: false
+          description: Lọc theo mức độ ưu tiên.
+          schema:
+            type: string
+            enum: [LOW, MEDIUM, HIGH]
+            example: "HIGH"
+
+        - name: overdueOnly
+          in: query
+          required: false
+          description: |
+            Nếu `true`, chỉ trả Work Order quá hạn (chưa Done và `dueDate < now()`).
+          schema:
+            type: boolean
+            default: false
+            example: true
+
+        - name: q
+          in: query
+          required: false
+          description: Tìm kiếm theo title hoặc description. Tối đa 100 ký tự.
+          schema:
+            type: string
+            maxLength: 100
+            example: "landing page"
+
+        - name: page
+          in: query
+          required: false
+          description: Số trang (0-indexed).
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+            example: 0
+
+        - name: size
+          in: query
+          required: false
+          description: Số bản ghi mỗi trang. Tối đa 100.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 20
+
+      responses:
+        "200":
+          description: Danh sách Work Order phù hợp điều kiện lọc, có phân trang.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedWorkOrderResponse'
+              example:
+                items:
+                  - id: 5001
+                    title: "Design landing page hero section"
+                    status: "IN_PROGRESS"
+                    statusColumnId: 2
+                    statusColumnName: "In Progress"
+                    priority: "HIGH"
+                    dueDate: "2026-09-30T17:00:00Z"
+                    assigneeId: 7
+                    assigneeName: "Lan Nguyen"
+                    isBlocked: false
+                    isOverdue: false
+                    createdAt: "2026-09-25T08:30:00Z"
+                  - id: 4998
+                    title: "Write copy for hero CTA"
+                    status: "TODO"
+                    statusColumnId: 1
+                    statusColumnName: "Todo"
+                    priority: "MEDIUM"
+                    dueDate: "2026-09-28T17:00:00Z"
+                    assigneeId: 9
+                    assigneeName: "Minh Tran"
+                    isBlocked: true
+                    isOverdue: true
+                    createdAt: "2026-09-24T10:00:00Z"
+                totalCount: 14
+                page: 0
+                pageSize: 20
+                hasNext: false
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+  # ───────────────────────────────────────────
+  # Endpoint 2: GET /api/v1/work-orders/{id}
+  # ───────────────────────────────────────────
+  /work-orders/{id}:
+    get:
+      tags:
+        - work-orders
+      operationId: getWorkOrderById
+      summary: Lấy chi tiết Work Order theo ID
+      description: |
+        Trả về toàn bộ thông tin của một Work Order, bao gồm trạng thái hiện tại,
+        thông tin assignee, blocker và lịch sử thay đổi.
+
+        **Business Rules:**
+        - User phải là thành viên của board chứa Work Order này.
+        - Nếu Work Order đã bị soft delete (`deletedAt != null`), trả `404`.
+        - Response bao gồm `history` — danh sách các lần thay đổi gần nhất (tối đa 50 bản ghi).
+
+        **Quyền truy cập:** `MEMBER`, `MANAGER`, `ADMIN` (phải là thành viên của board).
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          description: ID của Work Order cần lấy chi tiết.
+          schema:
+            type: integer
+            format: int64
+            minimum: 1
+            example: 5001
+      responses:
+        "200":
+          description: Chi tiết Work Order.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkOrderDetailResponse'
+              example:
+                id: 5001
+                boardId: 101
+                title: "Design landing page hero section"
+                description: "Thiết kế hero section và CTA button theo brand guideline Q4 2026"
+                status: "IN_PROGRESS"
+                statusColumnId: 2
+                statusColumnName: "In Progress"
+                priority: "HIGH"
+                dueDate: "2026-09-30T17:00:00Z"
+                isOverdue: false
+                assigneeId: 7
+                assigneeName: "Lan Nguyen"
+                ownerId: 5
+                ownerName: "Long Tran"
+                isBlocked: false
+                blockedReason: null
+                blockedAt: null
+                completedAt: null
+                createdBy: 5
+                createdByName: "Long Tran"
+                createdAt: "2026-09-25T08:30:00Z"
+                updatedAt: "2026-09-25T09:00:00Z"
+                history:
+                  - id: 1
+                    fieldName: "status"
+                    oldValue: "TODO"
+                    newValue: "IN_PROGRESS"
+                    changedByName: "Long Tran"
+                    changedAt: "2026-09-25T09:00:00Z"
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+
+# ─────────────────────────────────────────────────────────────────────────────
+# COMPONENTS
+# ─────────────────────────────────────────────────────────────────────────────
+components:
+
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT Access Token (short-lived, 15-30 phút). Lấy qua endpoint auth.
+
+  # ─────────────────────────────────────
+  # SCHEMAS
+  # ─────────────────────────────────────
+  schemas:
+
+    # ── Request Schemas ──────────────────
+    CreateWorkOrderRequest:
+      type: object
+      description: Payload tạo Work Order mới.
+      required:
+        - boardId
+        - title
+        - assigneeId
+        - priority
+        - dueDate
+        - statusColumnId
+      properties:
+        boardId:
+          type: integer
+          format: int64
+          description: ID của board chứa Work Order.
+          example: 101
+        title:
+          type: string
+          description: Tên Work Order. Không được blank, tối đa 255 ký tự.
+          minLength: 1
+          maxLength: 255
+          example: "Design landing page hero section"
+        description:
+          type: string
+          description: Mô tả chi tiết phạm vi và yêu cầu Work Order.
+          maxLength: 5000
+          nullable: true
+          example: "Thiết kế hero section và CTA button theo brand guideline Q4 2026"
+        assigneeId:
+          type: integer
+          format: int64
+          description: |
+            ID của user được giao Work Order.
+            Phải là thành viên hợp lệ của board khai báo bởi `boardId`.
+          example: 7
+        priority:
+          $ref: '#/components/schemas/Priority'
+        dueDate:
+          type: string
+          format: date-time
+          description: Hạn hoàn thành, UTC ISO-8601. Bắt buộc ở MVP; không được trong quá khứ.
+          example: "2026-09-30T17:00:00Z"
+        statusColumnId:
+          type: integer
+          format: int64
+          description: |
+            ID cột trạng thái ban đầu. Phải thuộc cùng board.
+            Thông thường là cột đầu tiên (ví dụ: "Todo").
+          example: 1
+
+    # ── Response Schemas ─────────────────
+    WorkOrderResponse:
+      type: object
+      description: Thông tin Work Order sau khi tạo hoặc cập nhật.
+      properties:
+        id:
+          type: integer
+          format: int64
+          description: ID của Work Order.
+          example: 5001
+        boardId:
+          type: integer
+          format: int64
+          example: 101
+        title:
+          type: string
+          example: "Design landing page hero section"
+        description:
+          type: string
+          nullable: true
+          example: "Thiết kế hero section và CTA button theo brand guideline Q4 2026"
+        status:
+          $ref: '#/components/schemas/WorkOrderStatus'
+        statusColumnId:
+          type: integer
+          format: int64
+          example: 1
+        statusColumnName:
+          type: string
+          description: Tên cột trạng thái hiển thị trên board.
+          example: "Todo"
+        priority:
+          $ref: '#/components/schemas/Priority'
+        dueDate:
+          type: string
+          format: date-time
+          example: "2026-09-30T17:00:00Z"
+        assigneeId:
+          type: integer
+          format: int64
+          example: 7
+        assigneeName:
+          type: string
+          description: Tên hiển thị của assignee.
+          example: "Lan Nguyen"
+        isBlocked:
+          type: boolean
+          default: false
+          example: false
+        blockedReason:
+          type: string
+          nullable: true
+          example: null
+        completedAt:
+          type: string
+          format: date-time
+          nullable: true
+          description: Thời điểm vào cột Done. Null nếu chưa hoàn thành.
+          example: null
+        createdBy:
+          type: integer
+          format: int64
+          description: ID user tạo (từ Security Context, không nhận từ client).
+          example: 5
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-25T08:30:00Z"
+        updatedAt:
+          type: string
+          format: date-time
+          example: "2026-09-25T08:30:00Z"
+
+    WorkOrderDetailResponse:
+      allOf:
+        - $ref: '#/components/schemas/WorkOrderResponse'
+        - type: object
+          description: Chi tiết đầy đủ Work Order, bao gồm lịch sử thay đổi.
+          properties:
+            ownerId:
+              type: integer
+              format: int64
+              nullable: true
+              example: 5
+            ownerName:
+              type: string
+              nullable: true
+              example: "Long Tran"
+            blockedAt:
+              type: string
+              format: date-time
+              nullable: true
+              example: null
+            createdByName:
+              type: string
+              example: "Long Tran"
+            isOverdue:
+              type: boolean
+              description: true nếu chưa Done và dueDate < now().
+              example: false
+            history:
+              type: array
+              description: Lịch sử thay đổi gần nhất, tối đa 50 bản ghi, sắp xếp `changedAt DESC`.
+              items:
+                $ref: '#/components/schemas/WorkOrderHistoryEntry'
+
+    WorkOrderSummary:
+      type: object
+      description: Thông tin tóm tắt Work Order dùng trong danh sách.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 5001
+        title:
+          type: string
+          example: "Design landing page hero section"
+        status:
+          $ref: '#/components/schemas/WorkOrderStatus'
+        statusColumnId:
+          type: integer
+          format: int64
+          example: 2
+        statusColumnName:
+          type: string
+          example: "In Progress"
+        priority:
+          $ref: '#/components/schemas/Priority'
+        dueDate:
+          type: string
+          format: date-time
+          example: "2026-09-30T17:00:00Z"
+        assigneeId:
+          type: integer
+          format: int64
+          example: 7
+        assigneeName:
+          type: string
+          example: "Lan Nguyen"
+        isBlocked:
+          type: boolean
+          example: false
+        isOverdue:
+          type: boolean
+          description: true nếu chưa Done và dueDate < now().
+          example: false
+        createdAt:
+          type: string
+          format: date-time
+          example: "2026-09-25T08:30:00Z"
+
+    PagedWorkOrderResponse:
+      type: object
+      description: |
+        Wrapper cho danh sách Work Order có phân trang (Offset Pagination).
+        Không trả raw list; luôn bọc trong object này.
+      required:
+        - items
+        - totalCount
+        - page
+        - pageSize
+        - hasNext
+      properties:
+        items:
+          type: array
+          description: Danh sách Work Order trong trang hiện tại.
+          items:
+            $ref: '#/components/schemas/WorkOrderSummary'
+        totalCount:
+          type: integer
+          description: Tổng số Work Order phù hợp điều kiện lọc.
+          example: 14
+        page:
+          type: integer
+          description: Trang hiện tại (0-indexed).
+          example: 0
+        pageSize:
+          type: integer
+          description: Số bản ghi mỗi trang.
+          example: 20
+        hasNext:
+          type: boolean
+          description: true nếu còn trang tiếp theo.
+          example: false
+
+    WorkOrderHistoryEntry:
+      type: object
+      description: Một bản ghi thay đổi trong lịch sử Work Order.
+      properties:
+        id:
+          type: integer
+          format: int64
+          example: 1
+        fieldName:
+          type: string
+          description: Tên trường bị thay đổi (ví dụ "status", "assigneeId", "dueDate").
+          example: "status"
+        oldValue:
+          type: string
+          nullable: true
+          example: "TODO"
+        newValue:
+          type: string
+          nullable: true
+          example: "IN_PROGRESS"
+        changedByName:
+          type: string
+          description: Tên user thực hiện thay đổi.
+          example: "Long Tran"
+        changedAt:
+          type: string
+          format: date-time
+          description: Thời điểm thay đổi (UTC).
+          example: "2026-09-25T09:00:00Z"
+
+    # ── Enum Schemas ─────────────────────
+    Priority:
+      type: string
+      description: Mức độ ưu tiên của Work Order.
+      enum:
+        - LOW
+        - MEDIUM
+        - HIGH
+      example: "HIGH"
+
+    WorkOrderStatus:
+      type: string
+      description: |
+        Trạng thái hiển thị của Work Order, derived từ `statusColumnId`.
+        `BLOCKED` là overlay state (không thay thế column; `isBlocked = true`).
+      enum:
+        - TODO
+        - IN_PROGRESS
+        - REVIEW
+        - DONE
+        - BLOCKED
+      example: "TODO"
+
+    # ── Error Schema (RFC 7807 Problem Details) ──
+    ProblemDetail:
+      type: object
+      description: |
+        Lỗi theo chuẩn RFC 7807 Problem Details.
+        Không bao giờ trả stack trace trong production.
+      required:
+        - type
+        - title
+        - status
+      properties:
+        type:
+          type: string
+          format: uri
+          description: URI mô tả loại lỗi.
+          example: "https://taskflow.internal/problems/validation-error"
+        title:
+          type: string
+          description: Tóm tắt ngắn loại lỗi.
+          example: "Validation Error"
+        status:
+          type: integer
+          description: HTTP status code.
+          example: 400
+        detail:
+          type: string
+          description: Mô tả cụ thể lỗi trong context hiện tại.
+          example: "title must not be blank"
+        instance:
+          type: string
+          format: uri
+          description: URI request gây ra lỗi.
+          example: "/api/v1/work-orders"
+        trackingId:
+          type: string
+          description: ID để tra cứu log; trả khi lỗi 500.
+          example: "err-20260925-abc123"
+        violations:
+          type: array
+          description: Danh sách các lỗi validation (chỉ có ở 400).
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                example: "title"
+              message:
+                type: string
+                example: "must not be blank"
+
+  # ─────────────────────────────────────
+  # RESPONSES (Reusable)
+  # ─────────────────────────────────────
+  responses:
+    BadRequest:
+      description: |
+        400 Bad Request — Request body không hợp lệ về cú pháp hoặc vi phạm constraint (@NotBlank, @Size...).
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://taskflow.internal/problems/validation-error"
+            title: "Validation Error"
+            status: 400
+            detail: "Request body contains invalid fields"
+            instance: "/api/v1/work-orders"
+            violations:
+              - field: "title"
+                message: "must not be blank"
+              - field: "dueDate"
+                message: "must not be null"
+
+    Unauthorized:
+      description: 401 Unauthorized — Token thiếu hoặc không hợp lệ.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://taskflow.internal/problems/unauthorized"
+            title: "Unauthorized"
+            status: 401
+            detail: "JWT token is missing or expired"
+            instance: "/api/v1/work-orders"
+
+    Forbidden:
+      description: 403 Forbidden — User không có quyền thực hiện hành động này.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://taskflow.internal/problems/forbidden"
+            title: "Forbidden"
+            status: 403
+            detail: "User is not a member of the requested board"
+            instance: "/api/v1/work-orders"
+
+    NotFound:
+      description: 404 Not Found — Work Order không tồn tại hoặc đã bị xoá.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://taskflow.internal/problems/not-found"
+            title: "Not Found"
+            status: 404
+            detail: "WorkOrder with id 9999 not found"
+            instance: "/api/v1/work-orders/9999"
+
+    InternalServerError:
+      description: 500 Internal Server Error — Lỗi server không mong muốn. Stack trace không được lộ ra ngoài.
+      content:
+        application/problem+json:
+          schema:
+            $ref: '#/components/schemas/ProblemDetail'
+          example:
+            type: "https://taskflow.internal/problems/internal-error"
+            title: "Internal Server Error"
+            status: 500
+            detail: "An unexpected error occurred. Please contact support with the trackingId."
+            instance: "/api/v1/work-orders"
+            trackingId: "err-20260925-xyz789"
