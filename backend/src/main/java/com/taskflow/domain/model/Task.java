@@ -2,6 +2,10 @@ package com.taskflow.domain.model;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.List;
+import java.util.ArrayList;
+import java.util.Set;
+import java.util.HashSet;
 
 public class Task {
     private UUID id;
@@ -9,7 +13,12 @@ public class Task {
     private String title;
     private String description;
     private Long statusColumnId;
-    private Long assigneeId;
+    private Set<Long> assigneeIds = new HashSet<>();
+    private Instant assignedDate;
+    private Instant startDate;
+    private List<Subtask> subtasks = new ArrayList<>();
+    private List<Comment> comments = new ArrayList<>();
+    private List<Attachment> attachments = new ArrayList<>();
     private Priority priority;
     private Instant dueDate;
     private Long createdBy;
@@ -24,13 +33,18 @@ public class Task {
 
     public Task() {}
 
-    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt, Boolean isBlocked, String blockedReason, Instant blockedAt) {
+    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Set<Long> assigneeIds, Instant assignedDate, Instant startDate, List<Subtask> subtasks, List<Comment> comments, List<Attachment> attachments, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt, Boolean isBlocked, String blockedReason, Instant blockedAt) {
         this.id = id;
         this.boardId = boardId;
         this.title = title;
         this.description = description;
         this.statusColumnId = statusColumnId;
-        this.assigneeId = assigneeId;
+        this.assigneeIds = assigneeIds != null ? assigneeIds : new HashSet<>();
+        this.assignedDate = assignedDate;
+        this.startDate = startDate;
+        this.subtasks = subtasks != null ? subtasks : new ArrayList<>();
+        this.comments = comments != null ? comments : new ArrayList<>();
+        this.attachments = attachments != null ? attachments : new ArrayList<>();
         this.priority = priority;
         this.dueDate = dueDate;
         this.createdBy = createdBy;
@@ -39,9 +53,17 @@ public class Task {
         this.deletedAt = deletedAt;
         this.position = position;
         this.completedAt = completedAt;
-        this.isBlocked = isBlocked != null ? isBlocked : false;
+        this.isBlocked = isBlocked;
         this.blockedReason = blockedReason;
         this.blockedAt = blockedAt;
+    }
+
+    public Task(UUID id, UUID boardId, String title, String description, Long statusColumnId, Long assigneeId, Priority priority, Instant dueDate, Long createdBy, Instant createdAt, Instant updatedAt, Instant deletedAt, Integer position, Instant completedAt, Boolean isBlocked, String blockedReason, Instant blockedAt) {
+        this(id, boardId, title, description, statusColumnId, 
+             assigneeId != null ? new HashSet<>(List.of(assigneeId)) : new HashSet<>(), 
+             null, null, new ArrayList<>(), new ArrayList<>(), new ArrayList<>(), 
+             priority, dueDate, createdBy, createdAt, updatedAt, deletedAt, position, 
+             completedAt, isBlocked, blockedReason, blockedAt);
     }
 
     public UUID getId() { return id; }
@@ -54,8 +76,18 @@ public class Task {
     public void setDescription(String description) { this.description = description; }
     public Long getStatusColumnId() { return statusColumnId; }
     public void setStatusColumnId(Long statusColumnId) { this.statusColumnId = statusColumnId; }
-    public Long getAssigneeId() { return assigneeId; }
-    public void setAssigneeId(Long assigneeId) { this.assigneeId = assigneeId; }
+    public Set<Long> getAssigneeIds() { return assigneeIds; }
+    public void setAssigneeIds(Set<Long> assigneeIds) { this.assigneeIds = assigneeIds; }
+    public Instant getAssignedDate() { return assignedDate; }
+    public void setAssignedDate(Instant assignedDate) { this.assignedDate = assignedDate; }
+    public Instant getStartDate() { return startDate; }
+    public void setStartDate(Instant startDate) { this.startDate = startDate; }
+    public List<Subtask> getSubtasks() { return subtasks; }
+    public void setSubtasks(List<Subtask> subtasks) { this.subtasks = subtasks; }
+    public List<Comment> getComments() { return comments; }
+    public void setComments(List<Comment> comments) { this.comments = comments; }
+    public List<Attachment> getAttachments() { return attachments; }
+    public void setAttachments(List<Attachment> attachments) { this.attachments = attachments; }
     public Priority getPriority() { return priority; }
     public void setPriority(Priority priority) { this.priority = priority; }
     public Instant getDueDate() { return dueDate; }
