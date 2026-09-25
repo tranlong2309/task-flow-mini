@@ -139,13 +139,13 @@ Khong coi permission UI hoac `GET /permissions` la security boundary.
 
 ## Tong ket
 
-| Nhom | So luong | Muc do chinh |
-|---|---:|---|
-| API contract va validation | 2 | P1 |
-| Audit va data integrity | 2 | P1 |
-| Authorization va transaction | 2 | P1/P2 |
-| Schema/search consistency | 3 | P2 |
-| Maintainability | 1 | P3 |
+| Nhom                         | So luong | Muc do chinh |
+| ---------------------------- | -------: | ------------ |
+| API contract va validation   |        2 | P1           |
+| Audit va data integrity      |        2 | P1           |
+| Authorization va transaction |        2 | P1/P2        |
+| Schema/search consistency    |        3 | P2           |
+| Maintainability              |        1 | P3           |
 
 ### Thu tu xu ly de xuat
 
