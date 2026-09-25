@@ -17,6 +17,7 @@ public record WorkOrderSummary(
         Priority priority,
         Instant dueDate,
         Long assigneeId,
+        java.util.Set<Long> assigneeIds,
         boolean isBlocked,
         boolean isOverdue,
         Instant createdAt
@@ -38,6 +39,7 @@ public record WorkOrderSummary(
                 task.getPriority(),
                 task.getDueDate(),
                 primaryAssigneeId,
+                task.getAssigneeIds(),
                 Boolean.TRUE.equals(task.getIsBlocked()),
                 isOverdue,
                 task.getCreatedAt()

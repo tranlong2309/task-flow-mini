@@ -31,6 +31,8 @@ public record WorkOrderResponse(
 
         // Assignee — spec dùng single assigneeId (OQ-06 chưa resolved, hiện tại lấy primary)
         Long assigneeId,
+        
+        java.util.Set<Long> assigneeIds, // Added for array format
 
         boolean isBlocked,
         String blockedReason,      // nullable — chỉ có khi isBlocked=true
@@ -73,6 +75,7 @@ public record WorkOrderResponse(
                 task.getDueDate(),
                 isOverdue,
                 primaryAssigneeId,
+                task.getAssigneeIds(),
                 Boolean.TRUE.equals(task.getIsBlocked()),
                 task.getBlockedReason(),
                 task.getBlockedAt(),
