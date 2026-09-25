@@ -94,7 +94,7 @@ export function KanbanColumn({ column, tasks, users, onTaskClick }: KanbanColumn
           <DraggableTask 
             key={task.id} 
             task={task} 
-            user={users.find((item) => item.id === task.assigneeId)} 
+            users={users.filter(u => task.assigneeIds?.includes(u.id) || task.assigneeId === u.id)} 
             onClick={() => onTaskClick(task.id)} 
           />
         ))}
