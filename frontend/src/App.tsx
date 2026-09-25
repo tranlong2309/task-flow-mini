@@ -4,7 +4,7 @@ import { DndContext, DragOverlay, PointerSensor, useSensor, useSensors, type Dra
 import { Bell, ChevronDown, CircleHelp, Filter, FolderKanban, LayoutDashboard, MoreHorizontal, Plus, Search, Settings, Sparkles, Target, Users } from 'lucide-react'
 import { authService, boardService, notificationService, projectService, taskService } from './lib/api/services'
 import { useAppStore } from './stores/useAppStore'
-import { can, useAuthStore } from './stores/authStore'
+import { can, canEditTask, useAuthStore } from './stores/authStore'
 import type { Board, User } from './types/domain'
 
 import { Avatar } from './components/ui/Avatar'
@@ -76,7 +76,13 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
     return () => clearTimeout(timer)
   }, [search])
 
-  const boardQuery = useQuery({ queryKey: ['board', selectedProjectId, taskFilters, debouncedSearch, priority], queryFn: () => boardService.get(selectedProjectId, { ...taskFilters, search: debouncedSearch || undefined, priority: priority !== 'all' ? priority as any : undefined }) })
+  const boardQuery = useQuery({
+    queryKey: ['board', selectedProjectId, taskFilters, debouncedSearch],
+    queryFn: () => boardService.get(selectedProjectId, {
+      ...taskFilters,
+      search: debouncedSearch || undefined,
+    })
+  })
   const usersQuery = useQuery({ queryKey: ['users'], queryFn: taskService.listUsers })
   const projectQuery = useQuery({ queryKey: ['projects'], queryFn: projectService.list })
   const notificationQuery = useQuery({ queryKey: ['notifications'], queryFn: notificationService.list })
@@ -84,7 +90,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
   const [activeId, setActiveId] = useState<string | number | null>(null)
   const [showNotifications, setShowNotifications] = useState(false)
   const [showCreate, setShowCreate] = useState(false)
-  const sensors = useSensors(useSensor(PointerSensor))
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 5 } }))
   
   const board = boardQuery.data
   const projects = projectQuery.data ?? []
@@ -105,7 +111,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
     onSettled: () => qc.invalidateQueries({ queryKey: ['board', selectedProjectId] }),
   })
 
-  const filteredTasks = useMemo(() => board?.tasks ?? [], [board?.tasks])
+  const filteredTasks = board?.tasks ?? []
 
   if (boardQuery.isLoading) return <div className="loading-screen"><Sparkles size={20} /> Loading your workspace...</div>
   if (boardQuery.isError || !board) return <div className="loading-screen error">Could not load the board. Please try again.</div>
@@ -245,9 +251,16 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
             <div className="board-toolbar">
               <div className="filter-chips">
                 <span>Showing <strong>{filteredTasks.length} tasks</strong></span>
-                <button className={priority === 'all' ? 'chip selected' : 'chip'} onClick={() => setPriority('all')}>All</button>
+                <button
+                  className={!taskFilters.priority ? 'chip selected' : 'chip'}
+                  onClick={() => setTaskFilters(f => ({ ...f, priority: undefined }))}
+                >All</button>
                 {(['HIGH', 'MEDIUM', 'LOW'] as const).map((item) => (
-                  <button key={item} className={priority === item ? 'chip selected' : 'chip'} onClick={() => setPriority(item)}>
+                  <button
+                    key={item}
+                    className={taskFilters.priority === item ? 'chip selected' : 'chip'}
+                    onClick={() => setTaskFilters(f => ({ ...f, priority: taskFilters.priority === item ? undefined : item }))}
+                  >
                     {item[0] + item.slice(1).toLowerCase()}
                   </button>
                 ))}
@@ -272,7 +285,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
               </div>
               <DragOverlay>
                 {activeTask ? (
-                  <TaskCard task={activeTask} user={users.find((item) => String(item.id) === String(activeTask.assigneeId))} overlay />
+                  <TaskCard task={activeTask} users={users.filter(u => activeTask.assigneeIds?.includes(u.id) || String(u.id) === String(activeTask.assigneeId))} overlay />
                 ) : null}
               </DragOverlay>
             </DndContext>
@@ -291,7 +304,7 @@ function AuthenticatedApp({ user, logout }: { user: User; logout: () => void }) 
           task={selectedTask} 
           user={users.find((item) => String(item.id) === String(selectedTask.assigneeId))} 
           column={board.columns.find((item) => String(item.id) === String(selectedTask.columnId))} 
-          canEdit={can(user.role, 'editTask')} 
+          canEdit={canEditTask(user || null, selectedTask)} 
           onClose={() => setSelectedTaskId(null)} 
         />
       )}
