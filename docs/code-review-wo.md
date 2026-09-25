@@ -1,220 +1,159 @@
-# AI-Assisted Code Review - WorkOrderController.java
+# Code Review - TaskController
 
-**Reviewer role:** Senior Security Code Reviewer
-**File reviewed:** WorkOrderController.java (POSCO MCI - du lieu mau tu LAB 2.2)
-**Review date:** 2026-09-22
+**Reviewer role:** Senior Solution Architect and Security Code Reviewer
+**Review scope:** Quan ly Work Order/Task trong Task Flow Mini
+**File reviewed:** `backend/src/main/java/com/taskflow/infrastructure/web/controller/TaskController.java`
+**Review date:** 2026-09-25
+**Reference:** `docs/api-rules.md`, `docs/security-rules.md`, `TASK_FLOW_REQUIREMENT.md`, `TASK_FLOW_TECHNICAL_SPEC.md`
 
----
+## Pham vi review
 
-## Doan code duoc review
+Du an khong co `WorkOrderController`, `equipment_id`, `TECHNICIAN/SUPERVISOR` hoac endpoint `/api/work-orders`. Trong Task Flow Mini, Work Order duoc hien thuc bang `Task` tren board Kanban. Review nay danh gia controller hien co va cac use case truc tiep ma controller goi.
+
+## Diem tot
+
+- Controller da dung base path `/api/v1` va resource path dang so nhieu `/tasks`.
+- Controller lay user hien tai tu `@AuthenticationPrincipal CustomUserDetails`, khong nhan `createdBy` tu request.
+- Logic nghiep vu duoc day vao application use case thay vi truy cap `DataSource`/SQL truc tiep.
+- Persistence dang dung Spring Data JPA repository, phu hop yeu cau phong SQL Injection.
+- Tao task tra `201 Created`; cac mutation status, move, block va unblock dung `PATCH`.
+- Application service da co cac kiem tra board permission va assignee membership o mot so flow.
+
+## Findings theo muc do
+
+### [P1 - API CONTRACT] CR-01: Request body dung `Map<String, Object>`, khong co DTO va `@Valid`
+
+**Vi tri:** `TaskController#createTask`, `updateTask`, `updateStatus`, `moveTask`, `blockTask`
+
+**Van de:** Controller parse thu cong payload bang cast, `toString()`, `Priority.valueOf` va `Instant.parse`. Cach nay khong tuan thu `docs/api-rules.md` Rule 5 va tao cac loi khong nhat quan:
+
+- Thieu field co the gay `NullPointerException` thay vi validation error `400`.
+- Sai kieu du lieu co the gay `ClassCastException`.
+- Enum/date sai format khong duoc tra ve theo Problem Details.
+- Khong co gioi han do dai cho title, description, note, reason va cac input string.
+
+**Khuyen nghi:** Tao request DTO rieng cho tung contract, dung `@Valid` va Bean Validation:
 
 ```java
-@RestController
-@RequestMapping("/api/work-orders")
-public class WorkOrderController {
-
-    @Autowired
-    private DataSource dataSource;
-
-    private static final String JWT_SECRET = "posco_mci_secret_key_2026_xyz";
-
-    @PostMapping("/create-wo")
-    public ResponseEntity<?> createWorkOrder(@RequestBody WorkOrderRequest request) {
-        // Bo qua buoc kiem tra xac thuc (Authentication/Authorization)
-
-        // Ghep noi chuoi truc tiep vao cau lenh SQL (Loi bao mat nghiem trong)
-        String query = "INSERT INTO work_orders (equipment_id, description, priority, status) VALUES ('"
-                + request.getEquipmentId() + "', '"
-                + request.getDescription() + "', '"
-                + request.getPriority() + "', 'NEW')";
-
-        try (Connection conn = dataSource.getConnection();
-             Statement stmt = conn.createStatement()) {
-
-            stmt.executeUpdate(query);
-            System.out.println("Da tao phieu thanh cong cho thiet bi: " + request.getEquipmentId());
-
-            return ResponseEntity.ok().body(new ApiResponse(true, "Tao phieu thanh cong!", null));
-
-        } catch (Exception e) {
-            // Lo thong tin nhay cam cua he thong va cau truy van loi ra ngoai
-            return ResponseEntity.status(500).body(new ErrorResponse(e.getMessage(), query));
-        }
-    }
-}
+public record CreateTaskRequest(
+        @NotNull UUID boardId,
+        @NotBlank @Size(max = 255) String title,
+        @Size(max = 5000) String description,
+        Long assigneeId,
+        @NotNull Priority priority,
+        @NotNull Instant dueDate,
+        @NotNull Long statusColumnId
+) {}
 ```
 
----
+Controller chi nhan DTO da validate va map sang use case. Khong cho client tu gui `createdBy`, role, permission hoac cac truong audit.
 
-## Review Comments (Theo thu tu uu tien)
+### [P1 - ERROR CONTRACT] CR-02: Error response khong theo RFC 7807 va map sai HTTP status
 
----
+**Vi tri:** Cac `catch (IllegalArgumentException e)` va cac response `Map.of("error", ...)`
 
-### [P1 - SPEC DELTA] RC-01: Sai ten endpoint so voi API Rules
+**Van de:** API rules yeu cau error response co `type`, `title`, `status`, `detail`. Hien tai controller tra raw map chi co `error`. Ngoai ra:
 
-**Vi tri:** `@PostMapping("/create-wo")`
-**Van de:** Endpoint dung dong tu "create" trong URI, vi pham `docs/api-rules.md` Rule #1 (REST Resource Naming - khong dung dong tu trong URI).
-**Muc do:** SPEC DELTA - Lech dac ta
-**Sua lai:**
-```java
-// GOOD
-@PostMapping   // POST /api/work-orders la du, khong can /create-wo
-```
+- Task khong ton tai dang bi tra `400` trong `getTask`, trong khi contract yeu cau `404`.
+- `AccessDeniedException` khong duoc xu ly nhat quan; mot so endpoint co the roi vao `500` thay vi `403` neu global handler khong bao phu.
+- Cac loi parse payload va loi runtime khong duoc map ro rang.
 
----
+**Khuyen nghi:** Dung `@RestControllerAdvice` tap trung de map `MethodArgumentNotValidException`, `IllegalArgumentException`, resource-not-found exception va `AccessDeniedException` sang `ProblemDetail`/RFC 7807. Controller khong nen tu tao error map o tung method.
 
-### [P1 - SPEC DELTA] RC-02: Thieu truong "created_by" - Khong biet ai tao phieu
+### [P1 - AUDIT] CR-03: Khong ghi day du `task_history` cho cac thay doi task
 
-**Vi tri:** Cau SQL INSERT khong co truong `created_by`
-**Van de:** Theo phan tich nghiep vu (br-analysis-wo.md), moi Work Order phai luu thong tin ai tao ra. SQL hien tai khong co `created_by`, dan den mat traceability.
-**Muc do:** SPEC DELTA - Thieu nghiep vu
-**Sua lai:** Lay username tu Security Context, them vao INSERT.
+**Vi tri:** `TaskApplicationService#updateTask`
 
----
+**Van de:** Service chi goi `recordHistory` khi thay doi `assigneeId` va `statusColumnId`. Theo business rules, moi thay doi deadline, owner/assignee va status phai co history; de dam bao audit va bao cao, thay doi priority va cac truong quan trong cung can quy tac ro rang. Hien tai cac thay doi `priority` va `dueDate` duoc save nhung khong ghi history.
 
-### [P2 - SECURITY] RC-03: Hardcoded JWT Secret - Loi bao mat NGHIEM TRONG
+**Khuyen nghi:** Truoc moi mutation, luu old/new value trong cung transaction voi task update. Toi thieu can bao phu `assignee_id`, `status_column_id`, `priority`, `due_date`, `title`, `description` neu day la cac truong duoc audit theo requirement. Them test xac nhan update khong the thanh cong neu history khong duoc ghi.
 
-**Vi tri:** `private static final String JWT_SECRET = "posco_mci_secret_key_2026_xyz";`
-**Van de:** JWT secret bi hardcode truc tiep trong source code. Bat ky ai co the doc duoc source code (GitHub, log, IDE) deu co the giai ma hoac gia mao token. Vi pham `docs/security-rules.md` Rule #1.
-**Muc do:** CRITICAL SECURITY
-**Sua lai:**
-```java
-// GOOD - Doc tu environment variable
-@Value("${jwt.secret}")
-private String jwtSecret;
-```
+### [P1 - DATA INTEGRITY] CR-04: Chua thay doi `completedAt` khi chuyen vao/ra cot Done
 
----
+**Vi tri:** `TaskApplicationService#updateTask`; can doi chieu them `TaskStatusApplicationService` va `MoveTaskApplicationService`
 
-### [P2 - SECURITY] RC-04: SQL Injection - Loi bao mat NGHIEM TRONG
+**Van de:** Contract BE-03 yeu cau khi task vao `Done` phai set `completedAt`, khi roi `Done` phai clear. Trong flow update task dang thay doi `statusColumnId` va ghi history nhung khong thay logic cap nhat `completedAt`. Neu status flow/move service cung khong xu ly, workload va overdue se sai.
 
-**Vi tri:** String concatenation khi xay dung cau SQL
-**Van de:** `request.getEquipmentId()`, `request.getDescription()`, `request.getPriority()` duoc ghep noi truc tiep vao chuoi SQL. Attacker co the inject lenh SQL tuy y.
-**Vi du tan cong:**
-```
-equipmentId = "'; DROP TABLE work_orders; --"
-```
-**Muc do:** CRITICAL SECURITY
-**Sua lai:**
-```java
-// GOOD - Dung Spring Data JPA / PreparedStatement
-workOrderRepository.save(new WorkOrder(request));
+**Khuyen nghi:** Tap trung quy tac status transition trong mot application service/domain policy. Xac dinh cot Done theo board, cap nhat `completedAt` trong cung transaction, va viet test cho ca hai chieu `Done`/`non-Done`.
 
-// Hoac neu bat buoc dung JDBC:
-String sql = "INSERT INTO work_orders (equipment_id, description, priority, status) VALUES (?, ?, ?, 'NEW')";
-try (PreparedStatement ps = conn.prepareStatement(sql)) {
-    ps.setString(1, request.getEquipmentId());
-    ps.setString(2, request.getDescription());
-    ps.setString(3, request.getPriority());
-    ps.executeUpdate();
-}
-```
+### [P1 - AUTHORIZATION] CR-05: Thieu enforcement ro rang tai controller; phu thuoc hoan toan vao service
 
----
+**Vi tri:** Tat ca endpoint trong `TaskController`
 
-### [P2 - SECURITY] RC-05: Khong co Authentication / Authorization
+**Van de:** Controller co `AuthenticationPrincipal`, nhung khong co `@PreAuthorize` hoac annotation tuong duong. Service da co kiem tra permission trong mot so flow, day la diem tot, nhung security rule yeu cau server-side authorization tren moi endpoint nhay cam. Can dam bao ca cac use case status/move/block/unblock/search deu kiem tra board membership va role, khong chi task CRUD.
 
-**Vi tri:** Toan bo method `createWorkOrder` - khong co annotation bao ve
-**Van de:** Bat ky request HTTP nao cung co the tao Work Order ma khong can xac thuc. Khong co `@PreAuthorize`, khong co Spring Security filter, khong co session check. Vi pham `docs/security-rules.md` Rule #4.
-**Muc do:** CRITICAL SECURITY
-**Sua lai:**
-```java
-// GOOD
-@PreAuthorize("hasRole('TECHNICIAN')")
-@PostMapping
-public ResponseEntity<WorkOrderResponse> createWorkOrder(
-        @Valid @RequestBody WorkOrderRequest request,
-        @AuthenticationPrincipal UserDetails currentUser) {
-    ...
-}
-```
+**Khuyen nghi:** Chon mot chien luoc nhat quan:
 
----
+- Dung `@PreAuthorize` cho cac quyen role co the mo ta o controller va giu object-level check trong service; hoac
+- Ghi ro policy o application service va bao phu bang integration tests cho MEMBER/MANAGER/ADMIN, user ngoai board va assignee khong hop le.
 
-### [P2 - SECURITY] RC-06: Lo thong tin nhay cam trong Error Response
+Khong coi permission UI hoac `GET /permissions` la security boundary.
 
-**Vi tri:** `return ResponseEntity.status(500).body(new ErrorResponse(e.getMessage(), query));`
-**Van de:** Tra ve ca `e.getMessage()` (co the lo ten bang, ten cot, cau truc DB) lan `query` (chuoi SQL day du) ra client. Attacker co the doc duoc cau SQL de phan tich cau truc DB. Vi pham `docs/security-rules.md` Rule #7.
-**Muc do:** HIGH SECURITY
-**Sua lai:**
-```java
-// GOOD - Chi log server-side, tra ve message chung cho client
-log.error("Failed to create work order: {}", e.getMessage(), e);
-return ResponseEntity.status(500).body(ProblemDetail.forStatusAndDetail(
-    HttpStatus.INTERNAL_SERVER_ERROR, "An unexpected error occurred."));
-```
+### [P2 - SCHEMA] CR-06: Tra truc tiep domain `Task` ra HTTP response
 
----
+**Vi tri:** `return ResponseEntity.ok(task)` va `body(task)`
 
-### [P3 - VALIDATION] RC-07: Thieu @Valid va rang buoc du lieu tren Request DTO
+**Van de:** API rules yeu cau schema response nghiem ngat. Tra domain object truc tiep lam API phu thuoc vao getter/field noi bo, de vo tinh lo truong audit hoac thay doi public contract khi domain thay doi. Response create/update/detail cung chua duoc phan tach ro theo contract.
 
-**Vi tri:** `@RequestBody WorkOrderRequest request`
-**Van de:** Khong co `@Valid` annotation. Neu `WorkOrderRequest` cung khong co `@NotNull`, `@NotBlank`, he thong se cho phep tao Work Order voi `equipmentId = null`, `description = ""`, `priority` la gia tri bat ky (ke ca gia tri la "'; DROP TABLE..."). Vi pham `docs/api-rules.md` Rule #5.
-**Muc do:** HIGH VALIDATION
-**Sua lai:**
-```java
-// Them @Valid vao parameter
-public ResponseEntity<?> createWorkOrder(@Valid @RequestBody WorkOrderRequest request)
+**Khuyen nghi:** Tao response DTO rieng cho create, detail, status/move va list. Chi expose cac field da duoc contract phe duyet; map o adapter/controller layer.
 
-// Them constraint len DTO
-public class WorkOrderRequest {
-    @NotBlank private String equipmentId;
-    @NotBlank @Size(max = 1000) private String description;
-    @NotNull private Priority priority; // dung Enum, khong phai String
-}
-```
+### [P2 - INPUT BOUNDARY] CR-07: Pagination va query input chua duoc validate day du
 
----
+**Vi tri:** `searchTasks`, `searchTasksAdvanced`
 
-### [P3 - VALIDATION] RC-08: Khong validate equipment_id voi danh sach thiet bi hoat dong
+**Van de:** Code chi gioi han `size > 100`, nhung khong chan `size <= 0`, `page < 0` hoac input search qua dai o endpoint thong thuong. Dieu nay co the gay loi repository, truy van khong hop ly hoac lam tang tai he thong.
 
-**Vi tri:** Truc tiep INSERT ma khong co buoc kiem tra
-**Van de:** Theo nghiep vu, chi duoc tao Work Order cho thiet bi dang `ACTIVE`. Hien tai code khong co buoc validate equipment_id hop le, dan den co the tao phieu cho thiet bi da ngung hoat dong hoac ma thiet bi khong ton tai.
-**Muc do:** HIGH SPEC / VALIDATION
-**Sua lai:**
-```java
-// Kiem tra truoc khi tao
-if (!equipmentRepository.existsByEquipmentIdAndStatus(request.getEquipmentId(), EquipmentStatus.ACTIVE)) {
-    return ResponseEntity.badRequest().body(ProblemDetail.forStatusAndDetail(
-        HttpStatus.BAD_REQUEST, "Equipment ID khong ton tai hoac khong hoat dong."));
-}
-```
+**Khuyen nghi:** Dung `Pageable` voi whitelist/max size va DTO/query object co validation. Gioi han do dai `search` o ca hai endpoint, normalize input va reject gia tri khong hop le bang `400 Problem Details`.
 
----
+### [P2 - CONSISTENCY] CR-08: Hai endpoint search co contract va cach xu ly khac nhau
 
-### [P4 - COMPLEXITY] RC-09: Su dung JDBC DataSource thay vi Spring Data JPA
+**Vi tri:** `GET /api/v1/boards/{boardId}/tasks` va `GET /api/v1/boards/{boardId}/tasks/search`
 
-**Vi tri:** `@Autowired private DataSource dataSource;`
-**Van de:** Inject raw `DataSource` va viet JDBC thu cong tao ra boilerplate code nhieu, kho maintain, de mac loi (khong dong Connection, khong dung PreparedStatement...). Spring Data JPA da co san trong stack.
-**Muc do:** MEDIUM COMPLEXITY
-**Sua lai:** Dung `WorkOrderRepository extends JpaRepository<WorkOrder, Long>` thay the.
+**Van de:** Hai API cung phuc vu tim task nhung dung query khac nhau (`search` so voi `q`, `statusColumnId` so voi `status`), response khac nhau va xu ly loi khac nhau. Endpoint search advanced con load columns truoc khi use case thuc hien permission check.
 
----
+**Khuyen nghi:** PO/Tech Lead chot mot contract search duy nhat trong BE-09/FE-08. Neu giu ca hai endpoint, phai quy dinh ro muc dich, response envelope va auth check truoc moi truy cap du lieu board. Khong de controller tu map ten column thanh magic fallback `-1L`.
 
-### [P5 - STYLE] RC-10: Dung System.out.println thay vi Logger
+### [P2 - TRANSACTION] CR-09: Can xac minh atomicity cua status/move va history
 
-**Vi tri:** `System.out.println("Da tao phieu thanh cong cho thiet bi: " + request.getEquipmentId());`
-**Van de:** Dung `System.out.println` trong production code - khong co log level, khong co structured logging, khong co log rotation. Vi pham `docs/coding-rules.md` Rule #4 (phai dung SLF4J).
-**Muc do:** LOW STYLE
-**Sua lai:**
-```java
-private static final Logger log = LoggerFactory.getLogger(WorkOrderController.class);
-// ...
-log.info("Work order created for equipment: {}", request.getEquipmentId());
-```
+**Vi tri:** `TaskController#updateStatus`, `moveTask`; cac use case tuong ung
 
----
+**Van de:** Controller chi forward request va khong the hien transaction boundary. BE-03 yeu cau move atomic, cap nhat position dong bo va ghi history. Neu transaction chi dat o mot service khac hoac thieu lock, hai request drag/drop dong thoi co the lam sai position.
 
-### [P5 - STYLE] RC-11: Response body khong tuan theo RFC 7807 Problem Details
+**Khuyen nghi:** Dat `@Transactional` tai application service boundary, dung locking/optimistic versioning phu hop va test concurrent move. Moi thay doi task, position, completedAt va history phai commit cung nhau.
 
-**Vi tri:** `return ResponseEntity.ok().body(new ApiResponse(true, "Tao phieu thanh cong!", null));`
-**Van de:** Class `ApiResponse` tu dinh nghia thay vi dung chuan RFC 7807. Khong nhat quan voi error response format. Vi pham `docs/api-rules.md` Rule #4.
-**Muc do:** LOW STYLE
-**Sua lai:** Dung `ResponseEntity.status(HttpStatus.CREATED).build()` cho 201 Created, error dung `ProblemDetail` cua Spring 6+.
+### [P3 - MAINTAINABILITY] CR-10: Controller dang chua qua nhieu parsing va fully-qualified type
 
----
+**Vi tri:** Toan bo `TaskController`
+
+**Van de:** Controller co parsing, status lookup, response mapping va exception mapping; dong thoi su dung wildcard import va nhieu fully-qualified class trong method. Dieu nay lam tang chi phi bao tri va kho review contract.
+
+**Khuyen nghi:** Tach request/response mapper, query object va exception handler; import class day du va giu controller mong, chi dieu phoi HTTP boundary.
+
+## Cac diem can xac minh them
+
+- Security filter chain co bat buoc authentication cho `/api/v1/tasks/**` va `/api/v1/boards/**` hay khong.
+- `TaskStatusApplicationService`, `MoveTaskApplicationService`, `BlockTaskApplicationService` co ghi history, enforce same-board column va cap nhat `completedAt` day du hay khong.
+- Global exception handler co map `AccessDeniedException`, validation exception va not-found exception dung `401/403/404` hay khong.
+- Contract co chap nhan `assigneeId = null` de unassign hay khong; implementation hien tai khong cho phep clear assignee vi chi xu ly khi gia tri khac null.
+- `ownerId` trong technical spec chua duoc controller/service su dung; PO/Tech Lead can chot owner va assignee la mot hay hai khai niem.
 
 ## Tong ket
 
-| Loai | So luong | Muc do |
-|---|---|---|
+| Nhom | So luong | Muc do chinh |
+|---|---:|---|
+| API contract va validation | 2 | P1 |
+| Audit va data integrity | 2 | P1 |
+| Authorization va transaction | 2 | P1/P2 |
+| Schema/search consistency | 3 | P2 |
+| Maintainability | 1 | P3 |
+
+### Thu tu xu ly de xuat
+
+1. Thay `Map<String, Object>` bang DTO co `@Valid` va chuan hoa Problem Details/HTTP status.
+2. Dam bao authorization, status transition, `completedAt`, position va history duoc xu ly atomic trong application service.
+3. Tach response DTO, chot contract search va bo sung integration tests cho RBAC/IDOR.
+4. Sau do refactor controller va them validation cho pagination/query.
+
+### Pham vi khong ap dung
+
+Khong co finding ve hardcoded secret, equipment-specific fields, raw JDBC statement hay SQL string concatenation trong source hien tai. Chi ghi nhan cac van de co that trong repository va khong dua them cac finding cua module ngoai pham vi.
