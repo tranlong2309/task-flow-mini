@@ -68,6 +68,8 @@ export interface Task {
   tags: string[]
   blocked: boolean
   blocker?: string
+  completedAt?: string | null
+  createdAt?: string
   updatedAt: string
 }
 
