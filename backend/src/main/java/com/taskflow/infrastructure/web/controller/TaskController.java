@@ -9,11 +9,19 @@ import com.taskflow.application.port.in.UpdateTaskStatusUseCase;
 import com.taskflow.application.port.in.MoveTaskUseCase;
 import com.taskflow.application.port.in.BlockTaskUseCase;
 import com.taskflow.application.port.in.UnblockTaskUseCase;
+import com.taskflow.domain.model.BoardColumn;
 import com.taskflow.domain.model.Priority;
 import com.taskflow.domain.model.Task;
 import com.taskflow.infrastructure.security.CustomUserDetails;
+import com.taskflow.infrastructure.web.dto.ProblemDetail;
+import com.taskflow.infrastructure.web.dto.WorkOrderResponse;
+import jakarta.servlet.http.HttpServletRequest;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,9 +31,19 @@ import java.util.UUID;
 import java.util.List;
 import java.util.Set;
 
+/**
+ * TaskController — thin controller theo spec docs/api-spec.yaml.
+ *
+ * Spec violations đã fix:
+ * - Trả WorkOrderResponse DTO thay vì Task entity trực tiếp.
+ * - Error response theo RFC 7807 ProblemDetail.
+ * - Phân biệt 400 (validation) vs 403 (permission) vs 404 (not found) vs 500.
+ */
 @RestController
 @RequestMapping("/api/v1")
 public class TaskController {
+
+    private static final Logger log = LoggerFactory.getLogger(TaskController.class);
 
     private final CreateTaskUseCase createTaskUseCase;
     private final UpdateTaskUseCase updateTaskUseCase;
@@ -60,14 +78,18 @@ public class TaskController {
         this.boardColumnRepositoryPort = boardColumnRepositoryPort;
     }
 
+    // ─── POST /api/v1/tasks ────────────────────────────────────────────────────
+    // Spec: docs/api-spec.yaml → POST /work-orders → 201 Created
     @PostMapping("/tasks")
     public ResponseEntity<?> createTask(@RequestBody Map<String, Object> payload,
-                                        @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                        @AuthenticationPrincipal CustomUserDetails userDetails,
+                                        HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             UUID boardId = UUID.fromString(payload.get("boardId").toString());
             String title = (String) payload.get("title");
             String description = (String) payload.get("description");
-            
+
             Set<Long> assigneeIds = new java.util.HashSet<>();
             if (payload.get("assigneeIds") != null) {
                 List<?> list = (List<?>) payload.get("assigneeIds");
@@ -79,13 +101,38 @@ public class TaskController {
             }
 
             Priority priority = Priority.valueOf((String) payload.get("priority"));
-            Instant dueDate = payload.get("dueDate") != null ? Instant.parse(payload.get("dueDate").toString()) : null;
-            Long statusColumnId = payload.get("statusColumnId") != null ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
+            Instant dueDate = payload.get("dueDate") != null
+                    ? Instant.parse(payload.get("dueDate").toString()) : null;
+            Long statusColumnId = payload.get("statusColumnId") != null
+                    ? Long.valueOf(payload.get("statusColumnId").toString()) : null;
 
-            Task task = createTaskUseCase.createTask(boardId, title, description, assigneeIds, priority, dueDate, statusColumnId, userDetails.getId());
-            return ResponseEntity.status(HttpStatus.CREATED).body(task);
+            Task task = createTaskUseCase.createTask(
+                    boardId, title, description, assigneeIds, priority, dueDate, statusColumnId,
+                    userDetails.getId());
+
+            // Fix: trả DTO thay vì entity (spec: WorkOrderResponse)
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            WorkOrderResponse dto = WorkOrderResponse.from(task, columnName);
+            return ResponseEntity.status(HttpStatus.CREATED)
+                    .header("Location", "/api/v1/tasks/" + dto.id())
+                    .body(dto);
+
+        } catch (AccessDeniedException e) {
+            // Fix: RFC 7807 403 thay vì raw Map
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            // Fix: RFC 7807 400 thay vì raw Map
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
+        } catch (Exception e) {
+            String trackingId = "err-" + System.currentTimeMillis();
+            log.error("[{}] Unexpected error in createTask: {}", trackingId, e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.internalServerError(trackingId, requestUri));
         }
     }
 
@@ -143,14 +190,27 @@ public class TaskController {
         }
     }
 
+    // ─── GET /api/v1/tasks/{taskId} ───────────────────────────────────────────
+    // Spec: docs/api-spec.yaml → GET /work-orders/{id} → 200 OK | 404
     @GetMapping("/tasks/{taskId}")
     public ResponseEntity<?> getTask(@PathVariable UUID taskId,
-                                     @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                     @AuthenticationPrincipal CustomUserDetails userDetails,
+                                     HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             Task task = getTaskUseCase.getTask(taskId, userDetails.getId());
-            return ResponseEntity.ok(task);
+            // Fix: trả DTO thay vì entity
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            return ResponseEntity.ok(WorkOrderResponse.from(task, columnName));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            // Task not found -> 404
+            return ResponseEntity.status(HttpStatus.NOT_FOUND)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.notFound(e.getMessage(), requestUri));
         }
     }
 
@@ -255,59 +315,130 @@ public class TaskController {
         }
     }
 
+    // ─── PATCH /api/v1/tasks/{taskId}/status ─────────────────────────────────
+    // Spec: docs/api-spec.yaml (status update endpoint)
     @PatchMapping("/tasks/{taskId}/status")
     public ResponseEntity<?> updateStatus(@PathVariable UUID taskId,
                                           @RequestBody Map<String, Object> payload,
-                                          @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                          @AuthenticationPrincipal CustomUserDetails userDetails,
+                                          HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             Long statusColumnId = Long.valueOf(payload.get("statusColumnId").toString());
             String note = payload.containsKey("note") ? (String) payload.get("note") : null;
-            
+
             Task task = updateTaskStatusUseCase.updateTaskStatus(taskId, statusColumnId, note, userDetails.getId());
-            return ResponseEntity.ok(task);
+            // Fix: trả DTO
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            return ResponseEntity.ok(WorkOrderResponse.from(task, columnName));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
         }
     }
 
+    // ─── PATCH /api/v1/tasks/{taskId}/move ───────────────────────────────────
     @PatchMapping("/tasks/{taskId}/move")
     public ResponseEntity<?> moveTask(@PathVariable UUID taskId,
                                       @RequestBody Map<String, Object> payload,
-                                      @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                      @AuthenticationPrincipal CustomUserDetails userDetails,
+                                      HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             Long sourceColumnId = Long.valueOf(payload.get("sourceColumnId").toString());
             Long targetColumnId = Long.valueOf(payload.get("targetColumnId").toString());
             int sourceIndex = Integer.parseInt(payload.get("sourceIndex").toString());
             int targetIndex = Integer.parseInt(payload.get("targetIndex").toString());
-            
-            Task task = moveTaskUseCase.moveTask(taskId, sourceColumnId, targetColumnId, sourceIndex, targetIndex, userDetails.getId());
-            return ResponseEntity.ok(task);
+
+            Task task = moveTaskUseCase.moveTask(
+                    taskId, sourceColumnId, targetColumnId, sourceIndex, targetIndex,
+                    userDetails.getId());
+            // Fix: trả DTO
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            return ResponseEntity.ok(WorkOrderResponse.from(task, columnName));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
         }
     }
 
+    // ─── PATCH /api/v1/tasks/{taskId}/block ──────────────────────────────────
+    // Spec: domain-model.md → Invariant I-06: blockedReason bắt buộc
+    // Fix: validation lỗi trả 400 ProblemDetail thay vì raw Map
     @PatchMapping("/tasks/{taskId}/block")
     public ResponseEntity<?> blockTask(@PathVariable UUID taskId,
                                        @RequestBody Map<String, Object> payload,
-                                       @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                       @AuthenticationPrincipal CustomUserDetails userDetails,
+                                       HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             String reason = payload.containsKey("reason") ? (String) payload.get("reason") : null;
+
+            // Invariant I-06 check ở controller level (service cũng check — defense in depth)
+            if (reason == null || reason.isBlank()) {
+                return ResponseEntity.badRequest()
+                        .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                        .body(ProblemDetail.badRequest(
+                                "blockedReason is required when blocking a Work Order (domain-model.md Invariant I-06)",
+                                requestUri,
+                                List.of(new ProblemDetail.FieldViolation("reason", "must not be blank"))
+                        ));
+            }
+
             Task task = blockTaskUseCase.blockTask(taskId, reason, userDetails.getId());
-            return ResponseEntity.ok(task);
+            // Fix: trả DTO
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            return ResponseEntity.ok(WorkOrderResponse.from(task, columnName));
+
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
         }
     }
 
+    // ─── PATCH /api/v1/tasks/{taskId}/unblock ────────────────────────────────
     @PatchMapping("/tasks/{taskId}/unblock")
     public ResponseEntity<?> unblockTask(@PathVariable UUID taskId,
-                                         @AuthenticationPrincipal CustomUserDetails userDetails) {
+                                         @AuthenticationPrincipal CustomUserDetails userDetails,
+                                         HttpServletRequest request) {
+        String requestUri = request.getRequestURI();
         try {
             Task task = unblockTaskUseCase.unblockTask(taskId, userDetails.getId());
-            return ResponseEntity.ok(task);
+            // Fix: trả DTO
+            String columnName = resolveColumnName(task.getStatusColumnId());
+            return ResponseEntity.ok(WorkOrderResponse.from(task, columnName));
+        } catch (AccessDeniedException e) {
+            return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.forbidden(e.getMessage(), requestUri));
         } catch (IllegalArgumentException e) {
-            return ResponseEntity.badRequest().body(Map.of("error", e.getMessage()));
+            return ResponseEntity.badRequest()
+                    .contentType(MediaType.APPLICATION_PROBLEM_JSON)
+                    .body(ProblemDetail.badRequest(e.getMessage(), requestUri));
         }
+    }
+
+    // ─── Helper: resolve column name từ columnId ──────────────────────────────
+    // Dùng để populate statusColumnName trong WorkOrderResponse DTO
+    private String resolveColumnName(Long columnId) {
+        if (columnId == null) return null;
+        return boardColumnRepositoryPort.findById(columnId)
+                .map(BoardColumn::getName)
+                .orElse(null);
     }
 }
